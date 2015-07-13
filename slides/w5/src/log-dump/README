@@ -1,0 +1,15 @@
+
+Usage:
+  Right   si
+  Left    rsi
+  Down    ni
+  Up      rni
+  Esc     fin
+  Q,Z     scroll stack view
+  Space   toggle char/hex
+  Click registers to highlight
+
+With <file>.yaml
+gdb -x log.py <file> then "log-dump <file>" in gdb
+
+With <file>.log and <file> binary, generate log.js by ./gen_page <file>

@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="generator" content="pandoc">
+  <title>Exploit the Vulnerability</title>
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <link rel="stylesheet" href="reveal.js/lib/css/tomorrow-night-bright.css">
+  <link rel="stylesheet" href="reveal.js/css/reveal.min.css"/>
+    <style type="text/css">code{white-space: pre;}</style>
+    <link rel="stylesheet" href="reveal.js/css/theme/simple.css" id="theme">
+  <link rel="stylesheet" media="print" href="reveal.js/css/print/pdf.css" />
+  <!--[if lt IE 9]>
+  <script src="reveal.js/lib/js/html5shiv.js"></script>
+  <![endif]-->
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+
+<section>
+    <h1 class="title">Exploit the Vulnerability</h1>
+    <h3 class="date"></h3>
+</section>
+
+<section><section id="source-code" class="titleslide slide level1"><h1>Source Code</h1></section><section id="source-code-1" class="slide level2">
+<h1>Source Code</h1>
+<p><a href="src.tar.gz">Examples</a></p>
+</section></section>
+<section><section id="bug-vulnerability" class="titleslide slide level1"><h1>Bug → Vulnerability</h1></section><section id="step-1-尋找漏洞" class="slide level2">
+<h1>Step 1: 尋找漏洞</h1>
+<ul>
+<li>用力看 code (代碼審計，code audit)</li>
+<li>Fuzz testing
+<ul>
+<li>Crash</li>
+<li>輸出不該有的內容</li>
+</ul></li>
+</ul>
+</section><section id="step-2-control-flow-hijack" class="slide level2">
+<h1>Step 2: Control-flow Hijack</h1>
+<ul>
+<li>試著控制程式的流程
+<ul>
+<li>改掉返回地址</li>
+<li>改掉函式指標，使得呼叫函式時的行為改變</li>
+<li>改掉變數值，使得程行的行為改變 (e.g. uid = 0)</li>
+</ul></li>
+</ul>
+</section><section id="step-3-execute-payload" class="slide level2">
+<h1>Step 3: Execute Payload</h1>
+<ul>
+<li>執行攻擊者的目標
+<ul>
+<li>開出 shell</li>
+<li>撈資料</li>
+<li>植入後門 (backdoor)</li>
+</ul></li>
+</ul>
+</section></section>
+<section><section id="buffer-overflow" class="titleslide slide level1"><h1>Buffer Overflow</h1></section><section id="vulnerable-function" class="slide level2">
+<h1>Vulnerable Function</h1>
+<ul>
+<li><code>gets</code></li>
+<li><code>scanf</code></li>
+<li><code>strcpy</code></li>
+<li><code>memcpy</code></li>
+<li><code>sprintf</code></li>
+</ul>
+</section><section id="stack-buffer-overflow" class="slide level2">
+<h1>Stack Buffer Overflow</h1>
+<ul>
+<li>Stack 上的區域變數存在<strong>溢出</strong> (overflow) 漏洞</li>
+<li>可以覆蓋掉返回地址 (return address)</li>
+<li>又稱 stack smashing</li>
+</ul>
+</section><section id="example-gets" class="slide level2">
+<h1>Example: gets()</h1>
+<pre class="cpp"><code>#include &lt;stdio.h&gt;
+
+void hacked() {
+  puts(&quot;Hacked!!&quot;);
+}
+
+int main() {
+  char str[10];
+  gets(str);
+}</code></pre>
+</section><section id="compiled-with-gcc" class="slide level2">
+<h1>Compiled with gcc</h1>
+<pre class="no-highlight"><code>gcc -o gets gets.c -m32 -fno-stack-protector -zexecstack
+gets.c: In function ‘main’:
+gets.c:9:3: warning: ‘gets’ is deprecated (declared at /usr/include/stdio.h:638) [-Wdeprecated-declarations]
+   gets(str);
+   ^
+/tmp/cc4cukNn.o: In function `main&#39;:
+gets.c:(.text+0x25): warning: the `gets&#39; function is dangerous and should not be used.</code></pre>
+</section><section id="return-hijack" class="slide level2">
+<h1>Return Hijack</h1>
+<ul>
+<li>返回地址會在呼叫函式時，會被堆到 stack 上</li>
+<li>這個函式內的區域變數，會存放在比較低的位址</li>
+<li>如果這個變數是個陣列，寫入過多資料時就會覆蓋到在比較高位的返回地址</li>
+</ul>
+</section><section id="stack-buffer-overflow-1" class="slide level2">
+<h1>Stack Buffer Overflow</h1>
+<figure>
+<img src="images/stack-overflow.png" />
+</figure>
+</section><section id="from-crash-to-hack" class="slide level2">
+<h1>From Crash to Hack</h1>
+<ul>
+<li>如果只是輸入的資料太多，程式通常就只會 crash</li>
+<li>必須構造特定的資料，才能利用這個漏洞</li>
+<li>需在輸入中放上要跳轉到的地址</li>
+</ul>
+</section><section id="tips" class="slide level2">
+<h1>Tips</h1>
+<ul>
+<li>先跳到已知的函式上，檢查有沒有成功控制程式流程
+<ul>
+<li>有沒有如預期的輸出</li>
+<li>跳到輸入函式上，應該要停住等待輸入 (但如果再輸入一些內容通常又會 crash)</li>
+</ul></li>
+</ul>
+</section><section id="jump-to-shellcode" class="slide level2">
+<h1>Jump to Shellcode</h1>
+<ul>
+<li>要想辦法找到 shellcode 的位址</li>
+<li>有 ASLR 的情況下，stack base 會隨機化，每次 shellcode 的位址會不同</li>
+</ul>
+</section><section id="nop-slide" class="slide level2">
+<h1>NOP slide</h1>
+<p><code>\x90\x90\x90\x90\x90\x90\x90\x90\x90</code><br><code>\x90\x90\x90\x90\x90\x90\x90\x90\x90</code><br><code>\x90\x90\x90\x90\x90\x90\x90\x90\x90</code></p>
+<ul>
+<li>記憶體中塞滿 <code>nop</code> 指令，最後面接上 shellcode</li>
+<li>跳到其中任何地方最後都會執行到 shellcode</li>
+</ul>
+</section><section id="jump-to-shellcode-1" class="slide level2">
+<h1>Jump to Shellcode</h1>
+<ul>
+<li>NOP slide 基本上不會成功，因為 ASLR 的範圍太大了</li>
+<li>利用暫存器或 stack 上殘留的值做精確的跳轉</li>
+</ul>
+</section><section id="gadget" class="slide level2">
+<h1>Gadget</h1>
+<ul>
+<li>KK <span style="font-family:&#39;Sans-serif&#39;">[`gædʒɪt]</span> 小機件；（小巧的）器具；小玩意兒[C]</li>
+<li>一小段有用的 binary code</li>
+<li>即使不是原本就有指令，也有可能恰好構成有用的 gadget</li>
+</ul>
+</section><section id="calljump-reg" class="slide level2">
+<h1>Call/Jump Reg</h1>
+<ul>
+<li>gcc 生成的執行檔中 <code>call eax</code> 很常見</li>
+<li>另外如果有 <code>jmp esp</code> 這樣的指令也可以利用，因為 stack 上的內容是可以被 overflow 控制的</li>
+</ul>
+</section><section id="return-by-value-on-stack" class="slide level2">
+<h1>Return by Value on Stack</h1>
+<ul>
+<li>x86 的參數會用 stack 傳遞，可能有 buffer pointer</li>
+<li>區域變數的值也有可能留在 stack 上</li>
+<li>如果能將 esp 調整到正確的位置再 return，就可以利用</li>
+</ul>
+</section><section id="example-input" class="slide level2">
+<h1>Example: input</h1>
+<pre class="cpp"><code>#include &lt;stdio.h&gt;
+int input(int len, char *str) {
+  char buf[80];
+  while (len--) {
+    buf[len] = str[len];
+    if (buf[len]==&#39; &#39;) buf[len] = &#39;_&#39;;
+  }
+  return 0;
+}
+int main() {
+  char str[0x80];
+  fgets(str, sizeof(str), stdin);
+  input(strlen(str)-1, str);
+}</code></pre>
+</section></section>
+<section><section id="shellcode" class="titleslide slide level1"><h1>Shellcode</h1></section><section id="特性" class="slide level2">
+<h1>特性</h1>
+<ul>
+<li>不可以有當做字串結尾的 <code>'\0'</code> 字元，或其它會被函數截斷的字元</li>
+<li>Position independent，在位址不確定的情況下也要可以正常執行</li>
+</ul>
+</section><section id="null-free" class="slide level2">
+<h1>Null-free</h1>
+<ul>
+<li>常見的緩衝區溢出是對字串操作時發生，這樣我們要送的 code 中就不可以有代表字串結束的<code>'\0'</code></li>
+<li>例如 <code>strcpy</code> 複製字串到 stack buffer 上，如果其中有 <code>'\0'</code> 就不會產生溢出</li>
+</ul>
+</section><section id="position-independent-code" class="slide level2">
+<h1>Position Independent Code</h1>
+<ul>
+<li>沒有辦法確定 shellcode 被放在哪裡的情況，不可以指定絕對位址</li>
+<li>一般 <code>jmp</code> 和 <code>call</code> 都是用相對位址，但拿 .data 裡的內容時會是絕對位址</li>
+</ul>
+</section><section id="launch-a-shell" class="slide level2">
+<h1>Launch a shell</h1>
+<pre class="avrasm"><code>section .text
+global _start
+_start:
+    mov eax, 0x0b
+    mov ebx, sh
+    mov ecx, argv
+    mov edx, envp
+    int 0x80
+
+section .data
+argv:
+    dd sh, 0
+envp:
+    dd 0
+sh:
+    db &quot;/bin/sh&quot;, 0</code></pre>
+</section><section id="how-to-set-eax-to-0" class="slide level2">
+<h1>How to set eax to 0?</h1>
+<ul>
+<li><code>mov eax, 0x0</code> → <code>b8 00 00 00 00</code></li>
+</ul>
+</section><section id="how-to-set-eax-to-1" class="slide level2">
+<h1>How to set eax to 1?</h1>
+<ul>
+<li><code>mov eax, 0x0</code> → <code>b8 01 00 00 00</code></li>
+</ul>
+</section><section id="get-offset-of-the-buffer-.data" class="slide level2">
+<h1>Get offset of the buffer (.data)?</h1>
+<ul>
+<li><code>mov ebx, sh</code> → <code>bb a4 90 04 08</code></li>
+</ul>
+</section><section id="embed-a-null-terminated-string" class="slide level2">
+<h1>Embed a null-terminated string</h1>
+<ul>
+<li><code>sh: db &quot;/bin/sh&quot;, 0</code></li>
+</ul>
+</section><section id="build-arrays-or-structures" class="slide level2">
+<h1>Build arrays or structures</h1>
+<ul>
+<li><code>argv: dd sh, 0</code></li>
+<li><code>envp: 0</code></li>
+</ul>
+</section><section id="general-solution" class="slide level2">
+<h1>General Solution</h1>
+<ul>
+<li>Read and jump</li>
+<li>Escape</li>
+<li>Push and jump</li>
+</ul>
+</section><section id="auto-escaping" class="slide level2">
+<h1>Auto Escaping</h1>
+<pre class="avrasm"><code>_start:
+  jmp shellcode
+escape:
+  xor eax, eax
+  mov esi, [esp]
+  mov edi, esi
+.L1:
+  mov dl, [esi]
+  inc esi
+  cmp dl, 0xff  ; escape charater - 0xff
+  je .B1
+  mov [edi], dl
+  inc edi
+  jmp .L1
+.B1:            ; escape
+  mov dl, [esi]
+  inc esi
+  cmp dl, 0xff  ; 0xff 0xff - shellcode end
+  jne .B2
+  ret
+.B2:            ; 0xff {others} - replace to &#39;\0&#39;
+  mov [edi], al
+  inc edi
+  jmp .L1
+shellcode:
+  call escape</code></pre>
+</section><section id="read-and-jump" class="slide level2">
+<h1>Read and Jump</h1>
+<ul>
+<li>如果 I/O 能繼續，就可以使用</li>
+<li>寫一段 null-free 的 <code>read(0, esp, length) + jmp esp</code> 就行</li>
+</ul>
+</section><section id="push-and-jump" class="slide level2">
+<h1>Push and Jump</h1>
+<ul>
+<li>另一種 escape 的做法，把 shellcode 用 <code>push</code> 全部放到 stack 上然後 <code>jmp esp</code></li>
+<li>Generator 比較麻煩</li>
+</ul>
+</section></section>
+<section><section id="buffer-overflow-examples" class="titleslide slide level1"><h1>Buffer Overflow Examples</h1></section><section id="gets" class="slide level2">
+<h1>gets</h1>
+<pre class="cpp"><code>int main() {
+  char str[10];
+  gets(str);
+}</code></pre>
+</section><section id="scanf" class="slide level2">
+<h1>scanf</h1>
+<pre class="cpp"><code>int main() {
+  char str[10];
+  scanf(&quot;%s&quot;, str);
+}</code></pre>
+</section><section id="strcpy" class="slide level2">
+<h1>strcpy</h1>
+<pre class="cpp"><code>void foo(char *a) {
+  char str[10];
+  strcpy(str, a);
+}</code></pre>
+</section><section id="sprintf" class="slide level2">
+<h1>sprintf</h1>
+<pre class="cpp"><code>void foo(char *a) {
+  char str[10];
+  sprintf(str, &quot;%s&quot;, a);
+}</code></pre>
+</section><section id="memcpy" class="slide level2">
+<h1>memcpy</h1>
+<pre class="cpp"><code>void foo(char *a, int n) {
+  char str[10];
+  memcpy(str, a, n);
+}</code></pre>
+</section><section id="failed-fgets" class="slide level2">
+<h1>Failed fgets</h1>
+<pre class="cpp"><code>void readline(char *buf, int size) {
+  int i = 0;
+  while (1) {
+    buf[i] = getchar();
+    if (buf[i]==&#39;\n&#39; || i==size) {
+      buf[i] = 0;
+      break;
+    }
+    i++;
+  }
+}
+int main() {
+  char buf[16];
+  readline(buf, 16);
+}</code></pre>
+</section><section id="failed-read" class="slide level2">
+<h1>Failed read</h1>
+<pre class="cpp"><code>int foo() {
+  char str[16];
+  read(0, str, 16);
+  puts(str);
+}</code></pre>
+</section><section id="failed-read-2" class="slide level2">
+<h1>Failed read 2</h1>
+<pre class="cpp"><code>int foo() {
+  char str[16];
+  int len;
+  len = read(0, str, 16);
+  str[len] = 0;
+}</code></pre>
+</section><section id="stat-open-file" class="slide level2">
+<h1>stat + open file</h1>
+<pre class="cpp"><code>int readfile(char *filename) {
+  char buf[1024];
+  struct stat st;
+  FILE *f;
+  int ch;
+  char *p = buf;
+  stat(filename, &amp;st);
+  if (st.st_size &lt; 1024) {
+    f = fopen(filename, &quot;rb&quot;);
+    while ((ch=fgetc(f))!=EOF) {
+      *p++ = ch;
+    }
+  } else { /*File too large*/ }
+}</code></pre>
+</section></section>
+<section><section id="protection-bypass" class="titleslide slide level1"><h1>Protection &amp; Bypass</h1></section><section id="prevent-buffer-overflow-exploit" class="slide level2">
+<h1>Prevent Buffer Overflow &amp; Exploit</h1>
+<ul>
+<li>StackGuard</li>
+<li>Data Execution Prevention</li>
+</ul>
+</section><section id="gcc-parameters" class="slide level2">
+<h1>gcc parameters</h1>
+<ul>
+<li>關閉 StackGuard <code>-fno-stack-protector</code></li>
+<li>關閉 DEP <code>-zexecstack</code></li>
+</ul>
+</section><section id="stackguard" class="slide level2">
+<h1>StackGuard</h1>
+<ul>
+<li>在函式被呼叫時，先在 stack 上放 <strong>canary</strong></li>
+<li>函式返回前先檢查這個值有沒有被修改</li>
+</ul>
+</section><section id="stackguard-1" class="slide level2">
+<h1>StackGuard</h1>
+<figure>
+<img src="images/stack-overflow2.png" />
+</figure>
+</section><section id="data-execution-prevention" class="slide level2">
+<h1>Data Execution Prevention</h1>
+<ul>
+<li>Shellcode 不能執行，因為是 data (stack, .data)</li>
+</ul>
+</section><section id="service-using-fork" class="slide level2">
+<h1>Service Using fork()</h1>
+<ul>
+<li><code>fork()</code> 後 canary 的值不會改變</li>
+<li>任何 address 也會相同，即 ASLR 不會重新作用</li>
+</ul>
+</section><section id="stack-reading" class="slide level2">
+<h1>Stack Reading</h1>
+<ul>
+<li>每次多 overflow 一個 byte，測試可能的值</li>
+<li>如果沒有 crash 就表示猜對了</li>
+<li>crash 就表示猜錯了，但重新連上 service 又會重新啟動</li>
+</ul>
+</section><section id="aslr-失效" class="slide level2">
+<h1>ASLR 失效</h1>
+<ul>
+<li>重新 fork 後 library 的位址不會改變</li>
+<li>Leaking 和 exploit 可以分兩次連線進行</li>
+</ul>
+</section><section id="overwrite-local-variable" class="slide level2">
+<h1>Overwrite Local Variable</h1>
+<ul>
+<li>如果只是 Overflow 到區域變數，不會蓋到 StackGuard canary</li>
+<li>利用程式本身對區域變數的操作，做出進一步的任意記憶體寫入</li>
+</ul>
+</section></section>
+<section><section id="case-study" class="titleslide slide level1"><h1>Case Study</h1></section><section id="string-zip-with-stackguard" class="slide level2">
+<h1>string zip (with StackGuard)</h1>
+<pre class="cpp"><code>#include &lt;stdio.h&gt;
+char str[256];
+int main() {
+  int i, j;
+  char buf[16];
+  fgets(str, sizeof(str), stdin);
+  for (i=0, j=0; str[i]; ++i) {
+    if (str[i]!=&#39; &#39;) {
+      buf[j++] = str[i];
+    }
+  }
+  buf[j] = 0;
+  puts(buf);
+}</code></pre>
+</section></section>
+    </div>
+  </div>
+
+  <script src="reveal.js/lib/js/head.min.js"></script>
+  <script src="reveal.js/js/reveal.min.js"></script>
+
+  <script>
+
+      // Full list of configuration options available here:
+      // https://github.com/hakimel/reveal.js#configuration
+      Reveal.initialize({
+        controls: true,
+        progress: true,
+        history: true,
+        center: true,
+        theme: 'my', // available themes are in /css/theme
+        transition: 'linear', // default/cube/page/concave/zoom/linear/fade/none
+
+        // Optional libraries used to extend on reveal.js
+        dependencies: [
+          { src: 'reveal.js/lib/js/classList.js', condition: function() { return !document.body.classList; } },
+          { src: 'reveal.js/plugin/highlight/highlight.js', async: true, callback: function() { hljs.initHighlightingOnLoad(); } },
+          { src: 'reveal.js/plugin/zoom-js/zoom.js', async: true, condition: function() { return !!document.body.classList; } },
+          { src: 'reveal.js/plugin/notes/notes.js', async: true, condition: function() { return !!document.body.classList; } },
+//          { src: 'reveal.js/plugin/search/search.js', async: true, condition: function() { return !!document.body.classList; }, }
+//          { src: 'reveal.js/plugin/remotes/remotes.js', async: true, condition: function() { return !!document.body.classList; } }
+]});
+    </script>
+  </body>
+</html>

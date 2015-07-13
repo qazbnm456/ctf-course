@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="generator" content="pandoc">
+  <title></title>
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <link rel="stylesheet" href="reveal.js/css/reveal.min.css"/>
+  <link rel="stylesheet" href="highlightjs/styles/tomorrow-night.css">
+    <style type="text/css">code{white-space: pre;}</style>
+    <link rel="stylesheet" href="reveal.js/css/theme/simple.css" id="theme">
+    <!-- If the query includes 'print-pdf', include the PDF print sheet -->
+    <script>
+      if( window.location.search.match( /print-pdf/gi ) ) {
+        var link = document.createElement( 'link' );
+        link.rel = 'stylesheet';
+        link.type = 'text/css';
+        link.href = 'reveal.js/css/print/pdf.css';
+        document.getElementsByTagName( 'head' )[0].appendChild( link );
+      }
+    </script>
+    <!--[if lt IE 9]>
+    <script src="reveal.js/lib/js/html5shiv.js"></script>
+    <![endif]-->
+    <script src="mathjax/MathJax.js?config=TeX-AMS-MML_HTMLorMML" type="text/javascript"></script>
+    <script type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+      "HTML-CSS": {
+        mtextFontInherit: true,
+        styles: {
+          ".MathJax .MJX-monospace": {
+            "font-family": "Monaco, monospace"
+          }
+        }
+      }
+    });
+    </script>
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+
+
+<section><section id="crypto-in-ctf---2" class="titleslide slide level1"><h1>Crypto in CTF - 2</h1></section><section id="crypto-in-ctf---2-1" class="slide level2">
+<h1>Crypto in CTF - 2</h1>
+<ul>
+<li>圖從維基來的</li>
+</ul>
+</section><section id="review" class="slide level2">
+<h1>Review</h1>
+<ul>
+<li>石器時代</li>
+<li>One Time Pad</li>
+<li>Block Cipher</li>
+<li>Modes of Operation</li>
+</ul>
+<div style="display: none;">
+<span class="math">\[
+\newcommand{\xor}{\mathbin{\oplus}}
+\newcommand{\ceil}[1]{\left \lceil #1 \right \rceil}
+\newcommand{\floor}[1]{\left \lfloor #1 \right \rfloor}
+\newcommand{\concat}{\mathbin{\|}}
+\newcommand{\IV}{\mathit{IV}}
+\]</span>
+</div>
+</section><section id="石器時代" class="slide level2">
+<h1>石器時代</h1>
+<ul>
+<li>凱薩密碼</li>
+<li>仿射密碼</li>
+</ul>
+</section><section id="石器時代-1" class="slide level2">
+<h1>石器時代</h1>
+<ul>
+<li>Substitution Cipher</li>
+<li>Vigenere Cipher</li>
+<li>Transposition Cipher</li>
+<li>Permutation cipher</li>
+<li>Autokey Cipher</li>
+</ul>
+</section><section id="石器時代-2" class="slide level2">
+<h1>石器時代</h1>
+<ul>
+<li>ADFGVX</li>
+<li>Bifid Cipher</li>
+<li>Two-square Cipher</li>
+<li>Hill Cipher</li>
+<li>Null Cipher</li>
+</ul>
+</section><section id="石器時代-3" class="slide level2">
+<h1>石器時代</h1>
+<ul>
+<li>Book Cipher</li>
+<li>DVORAK</li>
+<li>Base64</li>
+<li>Pig-Latin</li>
+<li>豬圈密碼</li>
+</ul>
+</section><section id="one-time-pad" class="slide level2">
+<h1>One Time Pad</h1>
+<ul>
+<li>用很多次會出事</li>
+</ul>
+<pre class="python"><code>def strxor(a, b):
+  return &#39;&#39;.join(chr(ord(x) ^ ord(y)) for x, y in zip(a, b))</code></pre>
+</section><section id="block-cipher" class="slide level2">
+<h1>Block Cipher</h1>
+<ul>
+<li>DES</li>
+<li>AES</li>
+</ul>
+</section><section id="modes-of-operation" class="slide level2">
+<h1>Modes of Operation</h1>
+</section><section id="ecb-mode" class="slide level2">
+<h1>ECB Mode</h1>
+<ul>
+<li>每塊分開加密</li>
+<li>直接看出 Pattern</li>
+<li>Encryption Oracle Attack</li>
+<li>Cut and Paste Attack</li>
+</ul>
+</section><section id="cbc-mode" class="slide level2">
+<h1>CBC Mode</h1>
+<ul>
+<li>先 xor 上一塊密文再加密</li>
+<li><span class="math">\(C_i = E(k, C_{i-1} \xor P_i)\)</span></li>
+<li><span class="math">\(P_i = D(k, C_i) \xor C_{i-1}\)</span></li>
+<li>Bit Flipping Attack</li>
+<li>Padding Oracle Attack</li>
+</ul>
+</section></section>
+<section><section id="padding-oracle-attack" class="titleslide slide level1"><h1>Padding Oracle Attack</h1></section><section id="padding-oracle-attack-1" class="slide level2">
+<h1>Padding Oracle Attack</h1>
+<ul>
+<li>CBC Mode</li>
+<li>有個密文 <span class="math">\(C\)</span> 想要解</li>
+<li>有個 Oracle，你可以隨便餵密文給他</li>
+<li>它會告訴你解出來的 Padding 合不合法</li>
+<li>假設是 PKCS5 Padding（補 <span class="math">\(x\)</span> 個 <span class="math">\(x\)</span>）</li>
+</ul>
+</section><section id="padding-oracle-attack-2" class="slide level2">
+<h1>Padding Oracle Attack</h1>
+<pre class="ruby"><code>def can_decrypt?(s)
+  s = Base64.decode64(s)
+  cipher = OpenSSL::Cipher::AES128.new(:CBC)
+  cipher.decrypt
+  cipher.key = IO.binread(&#39;key&#39;)
+  cipher.iv = s.slice!(0...16)
+  cipher.update(s)
+  cipher.final
+  true
+rescue OpenSSL::Cipher::CipherError
+  false
+end</code></pre>
+</section><section id="padding-oracle-attack-3" class="slide level2">
+<h1>Padding Oracle Attack</h1>
+<ul>
+<li>一塊一塊解</li>
+<li>假設現在要解 <span class="math">\(C_i = E(P_i \xor C_{i-1})\)</span></li>
+<li>隨便產個亂七八糟塊 <span class="math">\(R\)</span></li>
+<li>解看看 <span class="math">\(R \concat C_i\)</span></li>
+<li>會解出 <span class="math">\(D(C_i) \xor R\)</span></li>
+</ul>
+</section><section id="padding-oracle-attack-4" class="slide level2">
+<h1>Padding Oracle Attack</h1>
+<ul>
+<li><span class="math">\(R \concat C_i\)</span> 解出來基本上亂七八糟</li>
+<li>Padding 幾乎不可能是好的，除非結尾剛好是：</li>
+<li><code>01</code></li>
+<li><code>02 02</code></li>
+<li><code>03 03 03</code></li>
+<li>...</li>
+</ul>
+</section><section id="padding-oracle-attack-5" class="slide level2">
+<h1>Padding Oracle Attack</h1>
+<ul>
+<li>枚舉 <span class="math">\(R\)</span> 的結尾 byte</li>
+<li>總有某刻會變好的</li>
+<li>變好的很可能是剛好結尾踩到 <code>01</code></li>
+<li>也有一點點可能是 <code>02 02</code></li>
+<li>也有一點點點點可能是 <code>03 03 03</code></li>
+<li>亂動倒數第二個 byte，還是好的話一定是 <code>01</code></li>
+</ul>
+</section><section id="padding-oracle-attack-6" class="slide level2">
+<h1>Padding Oracle Attack</h1>
+<ul>
+<li>假設 <span class="math">\(j\)</span> 是結尾的 index</li>
+<li><span class="math">\(D(C_i) \xor R\)</span> 以 <code>01</code> 結尾</li>
+<li><span class="math">\(D(C_i)[j] \xor R[j] = \texttt{01}\)</span></li>
+<li><span class="math">\(D(C_i)[j] = \texttt{01} \xor R[j]\)</span></li>
+<li><span class="math">\(P_i[j] = D(C_i)[j] \xor C_{i-1}[j]\)</span></li>
+<li>成功獲得 1 byte!</li>
+</ul>
+</section><section id="padding-oracle-attack-7" class="slide level2">
+<h1>Padding Oracle Attack</h1>
+<ul>
+<li>繼續向前進，獲得倒數第二個 byte</li>
+<li>想要讓結尾變成 <code>02 02</code></li>
+<li><span class="math">\(j \leftarrow j - 1\)</span></li>
+<li><span class="math">\(R[j+1] \leftarrow R[j+1] \xor \texttt{01} \xor \texttt{02}\)</span></li>
+<li>枚舉 <span class="math">\(R[j]\)</span>，看看 padding 好不好</li>
+<li>依此類推，每 256 次可以碾出一個 byte</li>
+</ul>
+</section><section id="demo" class="slide level2">
+<h1>DEMO</h1>
+</section><section id="practice" class="slide level2">
+<h1>Practice</h1>
+</section><section id="遺珠之憾" class="slide level2">
+<h1>遺珠之憾</h1>
+<ul>
+<li>CTR Mode</li>
+<li>CFB Mode</li>
+<li>OFB Mode</li>
+<li>CCM Mode</li>
+<li>GCM Mode</li>
+<li>...</li>
+</ul>
+</section></section>
+<section><section id="stream-cipher" class="titleslide slide level1"><h1>Stream Cipher</h1></section><section id="stream-cipher-1" class="slide level2">
+<h1>Stream Cipher</h1>
+<ul>
+<li>從 One Time Pad 獲得啟發</li>
+<li>真隨機跟明文一樣長的的 Key 太麻煩了</li>
+<li>改用短短的 key 產出偽隨機的 keystream</li>
+</ul>
+</section><section id="stream-cipher-2" class="slide level2">
+<h1>Stream Cipher</h1>
+<ul>
+<li>沒有 Modes of Operation 的困擾</li>
+<li>沒有 padding 的困擾</li>
+<li>同樣的 keystream 用多次會爆炸</li>
+</ul>
+</section><section id="nonce" class="slide level2">
+<h1>Nonce</h1>
+<ul>
+<li><strong>N</strong>umber used only <strong>once</strong>.</li>
+<li>每次重產 key 太麻煩了</li>
+<li>key 跟 nonce 會決定整個 keystream</li>
+<li>不可以重複用</li>
+<li>不可以重複用</li>
+<li>不可以重複用</li>
+</ul>
+</section><section id="rc4" class="slide level2">
+<h1>RC4</h1>
+<ul>
+<li>最廣為使用的 Stream Cipher</li>
+<li>簡單、快、有效</li>
+<li>安全性有點弱</li>
+<li>又沒有很弱...</li>
+<li>不建議使用 (Google, Mozilla, Microsoft...)</li>
+</ul>
+</section><section id="rc4-1" class="slide level2">
+<h1>RC4</h1>
+<ul>
+<li><code>man arc4random</code></li>
+<li>曾經是商業機密</li>
+<li>簡單可自幹的加密</li>
+<li>Key Scheduling Algorithm</li>
+<li>Pseudo Random Generation Algorithm</li>
+</ul>
+</section><section id="key-scheduling" class="slide level2">
+<h1>Key Scheduling</h1>
+<ul>
+<li>key 很隨性，1 到 256 bytes 都可以</li>
+</ul>
+<pre class="python"><code>def KSA(key):
+  s = range(256)
+  j = 0
+  for i in xrange(256):
+    j = (j + s[i] + ord(key[i % len(key)])) % 256
+    s[i], s[j] = s[j], s[i]
+  return s</code></pre>
+</section><section id="pseudo-random-generation" class="slide level2">
+<h1>Pseudo Random Generation</h1>
+<pre class="python"><code>def PRGA(s):
+  i = j = 0
+  while True:
+    i = (i + 1) % 256
+    j = (j + s[i]) % 256
+    s[i], s[j] = s[j], s[i]
+    yield s[(s[i] + s[j]) % 256]</code></pre>
+</section><section id="rc4-in-python" class="slide level2">
+<h1>RC4 in Python</h1>
+<pre class="python"><code>def rc4(s, key):
+  k = PRGA(KSA(key))
+  return &#39;&#39;.join(chr(ord(x) ^ y) for x, y in zip(s, k))
+
+# Should be BBF316E8D940AF0AD3 from Wikipedia :)
+print rc4(&#39;Plaintext&#39;, &#39;Key&#39;).encode(&#39;hex&#39;)</code></pre>
+</section><section id="nonce-1" class="slide level2">
+<h1>Nonce?</h1>
+<ul>
+<li>亂 Hash 一通 <span class="math">\(H(k, n)\)</span></li>
+<li>直接接起來 <span class="math">\(k \concat n\)</span></li>
+<li>不太好，可是很多人這樣做 (WEP)</li>
+<li>Related Key Attack</li>
+</ul>
+</section><section id="怎麼個有點弱法" class="slide level2">
+<h1>怎麼個有點弱法</h1>
+<ul>
+<li>各種統計上有 Bias</li>
+<li>因為很常用，各種攻擊不斷進化</li>
+<li>請放棄他，我們有更好的選擇</li>
+</ul>
+</section><section id="ctr-mode" class="slide level2">
+<h1>CTR Mode</h1>
+<ul>
+<li>把 Block Cipher 變成 Stream Cipher</li>
+<li>把 Nonce 跟 Counter 接起來送給 <span class="math">\(E_k\)</span></li>
+<li>產出的 keystream xor 明文就是密文</li>
+<li><span class="math">\(C_i = E(k, N \concat i) \xor P_i\)</span></li>
+<li><span class="math">\(P_i = E(k, N \concat i) \xor C_i\)</span></li>
+<li>只用到加密</li>
+</ul>
+</section><section id="bit-flipping-attack" class="slide level2">
+<h1>Bit Flipping Attack</h1>
+<ul>
+<li>更容易了！</li>
+<li>翻密文的 1 bit 就會翻明文的 1 bit</li>
+<li><code>...; admin=0; ...</code></li>
+<li><code>...; admin=1; ...</code></li>
+</ul>
+</section><section id="其他攻擊" class="slide level2">
+<h1>其他攻擊</h1>
+<ul>
+<li>Many Time Pad</li>
+<li>預測 keystream</li>
+<li>各種嘗試 leak internal state</li>
+</ul>
+</section><section id="遺珠之憾-1" class="slide level2">
+<h1>遺珠之憾</h1>
+<ul>
+<li>RABBIT</li>
+<li>Salsa 20</li>
+<li>MICKEY</li>
+<li>...</li>
+</ul>
+</section><section id="unsolved-problem" class="slide level2">
+<h1>Unsolved Problem</h1>
+<ul>
+<li>怎麼交換 key</li>
+<li>訊息各種被篡改...</li>
+</ul>
+</section></section>
+<section><section id="key-exchange" class="titleslide slide level1"><h1>Key Exchange</h1></section><section id="key-exchange-1" class="slide level2">
+<h1>Key Exchange</h1>
+<ul>
+<li>有人會偷聽（不會偷改）</li>
+<li>要怎麼安全的交換 key</li>
+</ul>
+</section><section id="section" class="slide level2">
+<h1></h1>
+<figure>
+<img src="img/Diffie-Hellman_Key_Exchange.svg" />
+</figure>
+</section><section id="簡單常見實作" class="slide level2">
+<h1>簡單常見實作</h1>
+<ul>
+<li>協議公定 <span class="math">\(p, g\)</span></li>
+<li><span class="math">\(p\)</span> 是某個質數</li>
+<li><span class="math">\(g\)</span> 是模 <span class="math">\(p\)</span> 下的原根</li>
+<li>原根...?</li>
+</ul>
+</section><section id="原根" class="slide level2">
+<h1>原根？</h1>
+<ul>
+<li>考慮 <span class="math">\(g^1, g^2, \ldots, g^{p-1} \pmod{p}\)</span></li>
+<li>如果可以剛好鋪滿 <span class="math">\(1, 2, \ldots, p-1\)</span></li>
+<li>就說 <span class="math">\(g\)</span> 是質數 <span class="math">\(p\)</span> 的原根</li>
+<li>generator of that multiplicative group...</li>
+</ul>
+</section><section id="簡單常見實作-1" class="slide level2">
+<h1>簡單常見實作</h1>
+<ol type="1">
+<li>Alice 選個秘密 <span class="math">\(a\)</span>，送出 <span class="math">\(A = g^a \bmod{p}\)</span></li>
+<li>Bob 選個秘密 <span class="math">\(b\)</span>，送出 <span class="math">\(B = g^b \bmod{p}\)</span></li>
+<li>Alice 算 <span class="math">\(s = B^a \bmod{p}\)</span></li>
+<li>Bob 算 <span class="math">\(s = A^b \bmod{p}\)</span></li>
+</ol>
+</section><section id="簡單常見實作-2" class="slide level2">
+<h1>簡單常見實作</h1>
+<ul>
+<li>好人都有 <span class="math">\(s = g^{ab} \bmod{p}\)</span></li>
+<li>壞人只有 <span class="math">\(g^a \bmod {p}\)</span> 跟 <span class="math">\(g^b \bmod{p}\)</span></li>
+<li>壞人難以湊出 <span class="math">\(g^{ab} \bmod{p}\)</span></li>
+<li>壞人要解的叫離散對數問題</li>
+</ul>
+</section><section id="離散對數問題" class="slide level2">
+<h1>離散對數問題</h1>
+<ul>
+<li><span class="math">\(a^k \equiv b \pmod{p}\)</span></li>
+<li>給 <span class="math">\(a, b, p\)</span> 求 <span class="math">\(k\)</span></li>
+<li>Baby-step Giant-step Algorithm</li>
+</ul>
+</section><section id="寶寶步巨人步算法" class="slide level2">
+<h1>寶寶步巨人步算法</h1>
+<ul>
+<li><strong>Meet-in-the-middle</strong></li>
+<li><span class="math">\(m = \ceil{\sqrt{p}}\)</span></li>
+<li><span class="math">\(k = im + j, 0 \le i, j &lt; m\)</span></li>
+<li>兩層回圈枚舉所有可能還是 <span class="math">\(O(p)\)</span></li>
+<li>分開枚舉？</li>
+</ul>
+</section><section id="寶寶步巨人步算法-1" class="slide level2">
+<h1>寶寶步巨人步算法</h1>
+<ul>
+<li><span class="math">\(a^k \equiv a^{im+j} \equiv a^{im} \times a^j \equiv b \pmod{p}\)</span></li>
+<li>枚舉 <span class="math">\(i\)</span> 獲得 <span class="math">\(a^0, a^m, a^{2m}, \ldots, a^{(m-1)m}\)</span></li>
+<li>枚舉 <span class="math">\(j\)</span> 獲得 <span class="math">\(a^0, a^1, a^2, \ldots, a^{m-1}\)</span></li>
+<li>問有沒有一對 <span class="math">\((x, y)\)</span> 使得 <span class="math">\(xy \equiv b \pmod{p}\)</span></li>
+<li><span class="math">\(y \equiv x^{-1} b \pmod{p}\)</span></li>
+<li>用 Hash Table 存一邊，算另一邊，<span class="math">\(O(\sqrt{p})\)</span></li>
+</ul>
+</section><section id="unsolved-problem-1" class="slide level2">
+<h1>Unsolved Problem</h1>
+<ul>
+<li><span class="math">\(n\)</span> 個人就要交換 <span class="math">\(C(n, 2)\)</span> 次</li>
+<li>訊息各種被篡改...</li>
+</ul>
+</section></section>
+<section><section id="public-key-crypto" class="titleslide slide level1"><h1>Public Key Crypto</h1></section><section id="public-key-crypto-1" class="slide level2">
+<h1>Public Key Crypto</h1>
+<ul>
+<li>之前的加解密都是用同一把 key</li>
+<li>如果加密的 key 可以公諸於世多好</li>
+<li>每個人只要大喊自己的 public key 就好</li>
+<li>加密用 public key</li>
+<li>解密用 private key</li>
+</ul>
+</section><section id="public-key-crypto-2" class="slide level2">
+<h1>Public Key Crypto</h1>
+<ul>
+<li>RSA</li>
+<li>Knapsack</li>
+<li>ECC</li>
+</ul>
+</section></section>
+<section><section id="rsa" class="titleslide slide level1"><h1>RSA</h1></section><section id="rsa-1" class="slide level2">
+<h1>RSA</h1>
+<ul>
+<li>Ron Rivest</li>
+<li>Adi Shamir</li>
+<li>Leonard Adleman</li>
+<li>廣為使用的公鑰加密系統</li>
+</ul>
+</section><section id="前置知識" class="slide level2">
+<h1>前置知識</h1>
+<ul>
+<li>歐拉函數</li>
+<li>費馬小定理</li>
+<li>快速冪算法</li>
+</ul>
+</section><section id="歐拉函數" class="slide level2">
+<h1>歐拉函數</h1>
+<ul>
+<li><span class="math">\(\phi(n) = \left|\{k : 1 \le k \le n, \gcd(k, n) = 1\}\right|\)</span></li>
+<li><span class="math">\(\phi(3) = 2\)</span></li>
+<li><span class="math">\(\phi(8) = 4\)</span></li>
+<li><span class="math">\(\phi(14) = 6\)</span></li>
+</ul>
+</section><section id="歐拉函數-1" class="slide level2">
+<h1>歐拉函數</h1>
+<ul>
+<li><span class="math">\(\phi(p) = p - 1\)</span></li>
+<li><span class="math">\(\phi(n) = n \prod_{p|n} \left(1 - \frac{1}{p}\right)\)</span></li>
+<li><span class="math">\(\phi(14) = 14 \times \frac{1}{2} \times \frac{6}{7} = 6\)</span></li>
+</ul>
+</section><section id="費馬小定理" class="slide level2">
+<h1>費馬小定理</h1>
+<ul>
+<li><span class="math">\(a^p \equiv p \pmod{p}\)</span></li>
+<li><span class="math">\(a^{p-1} \equiv 1 \pmod{p}\)</span> when <span class="math">\(\gcd(a, p) = 1\)</span></li>
+<li>進化！</li>
+<li><span class="math">\(a^{\phi(n)} \equiv 1 \pmod{n}\)</span> when <span class="math">\(\gcd(a, n) = 1\)</span></li>
+</ul>
+</section><section id="豆知識" class="slide level2">
+<h1>豆知識</h1>
+<ul>
+<li>費馬小定理也可以拿來求模逆</li>
+<li><span class="math">\(a^{p-1} \equiv 1 \pmod{p}\)</span></li>
+<li><span class="math">\(a \times a^{p-2} \equiv 1 \pmod{p}\)</span></li>
+<li><span class="math">\(a^{-1} \equiv a^{p-2} \pmod{p}\)</span></li>
+</ul>
+</section><section id="快速冪算法" class="slide level2">
+<h1>快速冪算法</h1>
+<ul>
+<li>想要高速算出 <span class="math">\(a^b \bmod m\)</span></li>
+<li>分治法</li>
+<li>倍增法</li>
+</ul>
+</section><section id="分治法" class="slide level2">
+<h1>分治法</h1>
+<ul>
+<li><span class="math">\(t = a ^ \floor{\frac{b}{2}} \bmod m\)</span></li>
+<li>如果 <span class="math">\(b\)</span> 是偶數</li>
+<li>那 <span class="math">\(a ^ b \bmod m = t \times t \bmod m\)</span></li>
+<li>如果 <span class="math">\(b\)</span> 是奇數</li>
+<li>那 <span class="math">\(a ^ b \bmod m = t \times t \times a\bmod m\)</span></li>
+</ul>
+</section><section id="分治法-1" class="slide level2">
+<h1>分治法</h1>
+<pre class="python"><code>def pow_mod(a, b, m):
+  if b == 0:
+    return 1 % m
+  else:
+    t = pow_mod(a, b / 2, m)
+    if b % 2 == 0:
+      return t * t % m
+    else:
+      return t * t * a % m</code></pre>
+</section><section id="倍增法" class="slide level2">
+<h1>倍增法</h1>
+<ul>
+<li>把 <span class="math">\(b\)</span> 寫成二進制</li>
+<li>例如 <span class="math">\(b = 13 = 1101_2\)</span></li>
+<li><span class="math">\(a^{13} = a^8 \times a^4 \times a^1\)</span></li>
+</ul>
+</section><section id="豆知識-1" class="slide level2">
+<h1>豆知識</h1>
+<p>Ruby 中可以用 <code>x[i]</code> 取出 <span class="math">\(x\)</span> 第 <span class="math">\(i\)</span> 個 bit</p>
+<pre class="ruby"><code>p [13[3], 13[2], 13[1], 13[0]]
+# [1, 1, 0, 1]</code></pre>
+</section><section id="倍增法-1" class="slide level2">
+<h1>倍增法</h1>
+<pre class="ruby"><code>def pow_mod(a, b, m)
+  s = 1 % m
+  while b != 0
+    s = s * a % m if b[0] == 1
+    a = a * a % m
+    b &gt;&gt;= 1
+  end
+  s
+end</code></pre>
+</section><section id="懶-python" class="slide level2">
+<h1>懶 (python)</h1>
+<pre class="python"><code>print pow(2, 10, 100)</code></pre>
+</section><section id="懶-ruby" class="slide level2">
+<h1>懶 (ruby)</h1>
+<pre class="ruby"><code>require &#39;openssl&#39;
+puts 2.to_bn.mod_exp(10, 100)</code></pre>
+</section><section id="rsa-產-key" class="slide level2">
+<h1>RSA 產 key</h1>
+<ol type="1">
+<li>隨機挑兩個大質數 <span class="math">\(p, q\)</span></li>
+<li>算個 <span class="math">\(n = pq\)</span></li>
+<li>算個 <span class="math">\(\phi(n) = (p-1) \times (q-1)\)</span></li>
+<li>挑個 <span class="math">\(1 &lt; e &lt; \phi(n)\)</span>，且 <span class="math">\(\gcd(e, \phi(n)) = 1\)</span></li>
+<li>算個 <span class="math">\(d \equiv e^{-1} \pmod{\phi(n)}\)</span></li>
+</ol>
+<p><span class="math">\((n, e)\)</span> 是公鑰、<span class="math">\((n, d)\)</span> 是私鑰</p>
+</section><section id="rsa-加解密" class="slide level2">
+<h1>RSA 加解密</h1>
+<ul>
+<li><span class="math">\(c \equiv m^e \pmod{n}\)</span></li>
+<li><span class="math">\(m \equiv c^d \pmod{n}\)</span></li>
+<li><span class="math">\(c^d \equiv m^{ed} \equiv m^{h\phi(n) + 1} \equiv m \pmod{n}\)</span></li>
+</ul>
+</section><section id="舉個例子" class="slide level2">
+<h1>舉個例子</h1>
+<ol type="1">
+<li>挑個 <span class="math">\(p = 61, q = 53\)</span></li>
+<li>算個 <span class="math">\(n = 61 \times 53 = 3233\)</span></li>
+<li>算個 <span class="math">\(\phi(3233) = 60 \times 52 = 3120\)</span></li>
+<li>挑個 <span class="math">\(e = 17\)</span></li>
+<li>算個 <span class="math">\(d = 2753\)</span></li>
+</ol>
+</section><section id="舉個例子-1" class="slide level2">
+<h1>舉個例子</h1>
+<ul>
+<li>想要加密 <span class="math">\(m = 65\)</span></li>
+<li><span class="math">\(c = 65 ^ {17} \bmod{3233} = 2790\)</span></li>
+<li><span class="math">\(m = 2790 ^ {2753} \bmod{3233} = 65\)</span></li>
+</ul>
+</section><section id="rsa-note" class="slide level2">
+<h1>RSA Note</h1>
+<ul>
+<li>通常取 <span class="math">\(e=3\)</span> 或 <span class="math">\(e=65537\)</span></li>
+<li>比對稱加密慢很多很多</li>
+<li>知道 <span class="math">\(d, p, q, \phi(n)\)</span> 任何一個都可以解密</li>
+</ul>
+</section><section id="攻擊-rsa" class="slide level2">
+<h1>攻擊 RSA</h1>
+<ul>
+<li><span class="math">\(n\)</span> 太小</li>
+<li><span class="math">\(m\)</span> 太小</li>
+<li>共用 <span class="math">\(n\)</span></li>
+<li><span class="math">\(d\)</span> 太小</li>
+<li>爛 <span class="math">\(p, q\)</span></li>
+</ul>
+</section><section id="攻擊-rsa-1" class="slide level2">
+<h1>攻擊 RSA</h1>
+<ul>
+<li>Chosen Plaintext Attack</li>
+<li>Blinding</li>
+<li>Hastad's Broadcast Attack</li>
+<li>Franklin-Reiter Related Message Attack</li>
+<li>Partial Key Exposure Attack</li>
+<li>Bleichenbacher's Attack</li>
+</ul>
+</section><section id="攻擊-rsa-2" class="slide level2">
+<h1>攻擊 RSA</h1>
+<ul>
+<li>Timing Attack</li>
+<li>Random Fault</li>
+</ul>
+</section><section id="n-太小" class="slide level2">
+<h1><span class="math">\(n\)</span> 太小</h1>
+<ul>
+<li>質因數分解出 <span class="math">\(n = pq\)</span></li>
+<li>現在記錄是 RSA-768</li>
+<li>比賽中大概會出現 RSA-300 左右</li>
+</ul>
+</section><section id="質因數分解" class="slide level2">
+<h1>質因數分解</h1>
+<ul>
+<li>Trial Division</li>
+<li>Pollard's P - 1 Method</li>
+<li>Quadratic Sieve</li>
+<li>Number Field Sieve</li>
+</ul>
+</section><section id="自己寫太痛苦了" class="slide level2">
+<h1>自己寫太痛苦了</h1>
+<ul>
+<li>factordb</li>
+<li>factor</li>
+<li>YAFU</li>
+</ul>
+</section><section id="yafu" class="slide level2">
+<h1>YAFU</h1>
+<ul>
+<li>Yet Another Factoring Utility</li>
+<li>現成好用</li>
+<li>Fire-and-forgot</li>
+</ul>
+</section><section id="practice-1" class="slide level2">
+<h1>Practice</h1>
+</section><section id="m-太小" class="slide level2">
+<h1><span class="math">\(m\)</span> 太小</h1>
+<ul>
+<li><span class="math">\(c = m ^ e &lt; n\)</span></li>
+<li>直接開 <span class="math">\(e\)</span> 次方根就好...</li>
+</ul>
+</section><section id="爛-p-q" class="slide level2">
+<h1>爛 <span class="math">\(p, q\)</span></h1>
+<ul>
+<li><span class="math">\(p, q\)</span> 重複</li>
+<li>有很多 <span class="math">\(n\)</span> 任兩個做 <span class="math">\(\gcd\)</span></li>
+<li><span class="math">\(p, q\)</span> 太接近</li>
+</ul>
+</section><section id="p-q-太接近" class="slide level2">
+<h1><span class="math">\(p, q\)</span> 太接近</h1>
+<ul>
+<li>Leave as Homework :)</li>
+</ul>
+</section><section id="更多攻擊" class="slide level2">
+<h1>更多攻擊</h1>
+<ul>
+<li>下集待續</li>
+</ul>
+</section></section>
+    </div>
+  </div>
+
+
+  <script src="reveal.js/lib/js/head.min.js"></script>
+  <script src="reveal.js/js/reveal.min.js"></script>
+
+  <script>
+
+      // Full list of configuration options available here:
+      // https://github.com/hakimel/reveal.js#configuration
+      Reveal.initialize({
+        controls: true,
+        progress: true,
+        history: true,
+        center: true,
+        slideNumber: true,
+        theme: 'shik', // available themes are in /css/theme
+        transition: Reveal.getQueryHash().transition || 'default', // default/cube/page/concave/zoom/linear/fade/none
+
+        // Optional libraries used to extend on reveal.js
+        dependencies: [
+          { src: 'reveal.js/lib/js/classList.js', condition: function() { return !document.body.classList; } },
+          { src: 'reveal.js/plugin/zoom-js/zoom.js', async: true, condition: function() { return !!document.body.classList; } },
+          { src: 'reveal.js/plugin/notes/notes.js', async: true, condition: function() { return !!document.body.classList; } },
+          { src: 'highlightjs/highlight.pack.js', async: true, callback: function() { hljs.initHighlightingOnLoad(); } },
+//          { src: 'reveal.js/plugin/search/search.js', async: true, condition: function() { return !!document.body.classList; }, }
+//          { src: 'reveal.js/plugin/remotes/remotes.js', async: true, condition: function() { return !!document.body.classList; } }
+]});
+    </script>
+    </body>
+</html>

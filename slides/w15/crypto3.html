@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="generator" content="pandoc">
+  <title></title>
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <link rel="stylesheet" href="reveal.js/css/reveal.min.css"/>
+  <link rel="stylesheet" href="highlightjs/styles/tomorrow-night.css">
+    <style type="text/css">code{white-space: pre;}</style>
+    <link rel="stylesheet" href="reveal.js/css/theme/simple.css" id="theme">
+    <!-- If the query includes 'print-pdf', include the PDF print sheet -->
+    <script>
+      if( window.location.search.match( /print-pdf/gi ) ) {
+        var link = document.createElement( 'link' );
+        link.rel = 'stylesheet';
+        link.type = 'text/css';
+        link.href = 'reveal.js/css/print/pdf.css';
+        document.getElementsByTagName( 'head' )[0].appendChild( link );
+      }
+    </script>
+    <!--[if lt IE 9]>
+    <script src="reveal.js/lib/js/html5shiv.js"></script>
+    <![endif]-->
+    <script src="mathjax/MathJax.js?config=TeX-AMS-MML_HTMLorMML" type="text/javascript"></script>
+    <script type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+      "HTML-CSS": {
+        mtextFontInherit: true,
+        styles: {
+          ".MathJax .MJX-monospace": {
+            "font-family": "Monaco, monospace"
+          }
+        }
+      }
+    });
+    </script>
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+
+
+<section><section id="crypto-in-ctf---3" class="titleslide slide level1"><h1>Crypto in CTF - 3</h1></section><section id="crypto-in-ctf---3-1" class="slide level2">
+<h1>Crypto in CTF - 3</h1>
+<ul>
+<li>圖從維基來的</li>
+</ul>
+</section><section id="review" class="slide level2">
+<h1>Review</h1>
+<ul>
+<li>Too Lazy to do that</li>
+</ul>
+</section><section id="news" class="slide level2">
+<h1>News</h1>
+<ul>
+<li><a href="https://github.com/blog/1937-improving-github-s-ssl-setup">Github 兩周後廢 RC4 in SSL</a></li>
+</ul>
+<div style="display: none;">
+<span class="math">\[
+\newcommand{\xor}{\mathbin{\oplus}}
+\newcommand{\ceil}[1]{\left \lceil #1 \right \rceil}
+\newcommand{\floor}[1]{\left \lfloor #1 \right \rfloor}
+\newcommand{\concat}{\mathbin{\|}}
+\newcommand{\IV}{\mathit{IV}}
+\]</span>
+</div>
+</section><section id="public-key-crypto" class="slide level2">
+<h1>Public Key Crypto</h1>
+<ul>
+<li>RSA</li>
+<li>Knapsack</li>
+<li>ECC</li>
+</ul>
+</section></section>
+<section><section id="rsa" class="titleslide slide level1"><h1>RSA</h1></section><section id="rsa-1" class="slide level2">
+<h1>RSA</h1>
+<ul>
+<li>Ron Rivest</li>
+<li>Adi Shamir</li>
+<li>Leonard Adleman</li>
+<li>廣為使用的公鑰加密系統</li>
+</ul>
+</section><section id="前置知識" class="slide level2">
+<h1>前置知識</h1>
+<ul>
+<li>歐拉函數</li>
+<li>費馬小定理</li>
+<li>快速冪算法</li>
+</ul>
+</section><section id="歐拉函數" class="slide level2">
+<h1>歐拉函數</h1>
+<ul>
+<li><span class="math">\(\phi(n) = \left|\{k : 1 \le k \le n, \gcd(k, n) = 1\}\right|\)</span></li>
+<li><span class="math">\(\phi(3) = 2\)</span></li>
+<li><span class="math">\(\phi(8) = 4\)</span></li>
+<li><span class="math">\(\phi(14) = 6\)</span></li>
+</ul>
+</section><section id="歐拉函數-1" class="slide level2">
+<h1>歐拉函數</h1>
+<ul>
+<li><span class="math">\(\phi(p) = p - 1\)</span></li>
+<li><span class="math">\(\phi(n) = n \prod_{p|n} \left(1 - \frac{1}{p}\right)\)</span></li>
+<li><span class="math">\(\phi(14) = 14 \times \frac{1}{2} \times \frac{6}{7} = 6\)</span></li>
+</ul>
+</section><section id="費馬小定理" class="slide level2">
+<h1>費馬小定理</h1>
+<ul>
+<li><span class="math">\(a^p \equiv p \pmod{p}\)</span></li>
+<li><span class="math">\(a^{p-1} \equiv 1 \pmod{p}\)</span> when <span class="math">\(\gcd(a, p) = 1\)</span></li>
+<li>進化！</li>
+<li><span class="math">\(a^{\phi(n)} \equiv 1 \pmod{n}\)</span> when <span class="math">\(\gcd(a, n) = 1\)</span></li>
+</ul>
+</section><section id="豆知識" class="slide level2">
+<h1>豆知識</h1>
+<ul>
+<li>費馬小定理也可以拿來求模逆</li>
+<li><span class="math">\(a^{p-1} \equiv 1 \pmod{p}\)</span></li>
+<li><span class="math">\(a \times a^{p-2} \equiv 1 \pmod{p}\)</span></li>
+<li><span class="math">\(a^{-1} \equiv a^{p-2} \pmod{p}\)</span></li>
+</ul>
+</section><section id="快速冪算法" class="slide level2">
+<h1>快速冪算法</h1>
+<ul>
+<li>想要高速算出 <span class="math">\(a^b \bmod m\)</span></li>
+<li>分治法</li>
+<li>倍增法</li>
+</ul>
+</section><section id="分治法" class="slide level2">
+<h1>分治法</h1>
+<ul>
+<li><span class="math">\(t = a ^ \floor{\frac{b}{2}} \bmod m\)</span></li>
+<li>如果 <span class="math">\(b\)</span> 是偶數</li>
+<li>那 <span class="math">\(a ^ b \bmod m = t \times t \bmod m\)</span></li>
+<li>如果 <span class="math">\(b\)</span> 是奇數</li>
+<li>那 <span class="math">\(a ^ b \bmod m = t \times t \times a\bmod m\)</span></li>
+</ul>
+</section><section id="分治法-1" class="slide level2">
+<h1>分治法</h1>
+<pre class="python"><code>def pow_mod(a, b, m):
+  if b == 0:
+    return 1 % m
+  else:
+    t = pow_mod(a, b / 2, m)
+    if b % 2 == 0:
+      return t * t % m
+    else:
+      return t * t * a % m</code></pre>
+</section><section id="倍增法" class="slide level2">
+<h1>倍增法</h1>
+<ul>
+<li>把 <span class="math">\(b\)</span> 寫成二進制</li>
+<li>例如 <span class="math">\(b = 13 = 1101_2\)</span></li>
+<li><span class="math">\(a^{13} = a^8 \times a^4 \times a^1\)</span></li>
+</ul>
+</section><section id="二進制" class="slide level2">
+<h1>二進制</h1>
+<p>in Ruby</p>
+<pre class="ruby"><code>puts 217.to_s(2) # 11011001</code></pre>
+<p>in Python</p>
+<pre class="python"><code>print bin(217) # 0b11011001</code></pre>
+</section><section id="豆知識-1" class="slide level2">
+<h1>豆知識</h1>
+<p>Ruby 中可以用 <code>x[i]</code> 取出 <span class="math">\(x\)</span> 第 <span class="math">\(i\)</span> 個 bit</p>
+<pre class="ruby"><code>p [13[3], 13[2], 13[1], 13[0]]
+# [1, 1, 0, 1]</code></pre>
+</section><section id="倍增法-1" class="slide level2">
+<h1>倍增法</h1>
+<pre class="ruby"><code>def pow_mod(a, b, m)
+  s = 1 % m
+  while b != 0
+    s = s * a % m if b[0] == 1
+    a = a * a % m
+    b &gt;&gt;= 1
+  end
+  s
+end</code></pre>
+</section><section id="懶-python" class="slide level2">
+<h1>懶 (python)</h1>
+<pre class="python"><code>print pow(2, 10, 100)</code></pre>
+</section><section id="懶-ruby" class="slide level2">
+<h1>懶 (ruby)</h1>
+<pre class="ruby"><code>require &#39;openssl&#39;
+puts 2.to_bn.mod_exp(10, 100)</code></pre>
+</section><section id="rsa-產-key" class="slide level2">
+<h1>RSA 產 key</h1>
+<ol type="1">
+<li>隨機挑兩個大質數 <span class="math">\(p, q\)</span></li>
+<li>算個 <span class="math">\(n = pq\)</span></li>
+<li>算個 <span class="math">\(\phi(n) = (p-1) \times (q-1)\)</span></li>
+<li>挑個 <span class="math">\(e\)</span>，且 <span class="math">\(\gcd(e, \phi(n)) = 1\)</span></li>
+<li>算個 <span class="math">\(d \equiv e^{-1} \pmod{\phi(n)}\)</span></li>
+</ol>
+<p><span class="math">\((n, e)\)</span> 是公鑰、<span class="math">\((n, d)\)</span> 是私鑰</p>
+</section><section id="rsa-加解密" class="slide level2">
+<h1>RSA 加解密</h1>
+<ul>
+<li><span class="math">\(c \equiv m^e \pmod{n}\)</span></li>
+<li><span class="math">\(m \equiv c^d \pmod{n}\)</span></li>
+<li><span class="math">\(c^d \equiv m^{ed} \equiv m^{h\phi(n) + 1} \equiv m \pmod{n}\)</span></li>
+</ul>
+</section><section id="舉個例子" class="slide level2">
+<h1>舉個例子</h1>
+<ol type="1">
+<li>挑個 <span class="math">\(p = 61, q = 53\)</span></li>
+<li>算個 <span class="math">\(n = 61 \times 53 = 3233\)</span></li>
+<li>算個 <span class="math">\(\phi(3233) = 60 \times 52 = 3120\)</span></li>
+<li>挑個 <span class="math">\(e = 17\)</span></li>
+<li>算個 <span class="math">\(d = 2753\)</span></li>
+</ol>
+</section><section id="舉個例子-1" class="slide level2">
+<h1>舉個例子</h1>
+<ul>
+<li>想要加密 <span class="math">\(m = 65\)</span></li>
+<li><span class="math">\(c = 65 ^ {17} \bmod{3233} = 2790\)</span></li>
+<li><span class="math">\(m = 2790 ^ {2753} \bmod{3233} = 65\)</span></li>
+</ul>
+</section><section id="rsa-note" class="slide level2">
+<h1>RSA Note</h1>
+<ul>
+<li>通常取 <span class="math">\(e=3\)</span> 或 <span class="math">\(e=65537\)</span></li>
+<li>比對稱加密慢很多很多</li>
+<li>實務上通常會有隨機 Padding</li>
+<li>知道 <span class="math">\(d, p, q, \phi(n)\)</span> 任何一個都可以解密</li>
+</ul>
+</section><section id="攻擊-rsa" class="slide level2">
+<h1>攻擊 RSA</h1>
+</section><section id="n-太小" class="slide level2">
+<h1><span class="math">\(n\)</span> 太小</h1>
+<ul>
+<li>質因數分解出 <span class="math">\(n = pq\)</span></li>
+<li>現在記錄是 RSA-768</li>
+<li>比賽中大概會出現 RSA-300 左右</li>
+</ul>
+</section><section id="質因數分解" class="slide level2">
+<h1>質因數分解</h1>
+<ul>
+<li>Trial Division</li>
+<li>Pollard's P - 1 Method</li>
+<li>Quadratic Sieve</li>
+<li>Number Field Sieve</li>
+</ul>
+</section><section id="自己寫太痛苦了" class="slide level2">
+<h1>自己寫太痛苦了</h1>
+<ul>
+<li>factordb</li>
+<li>factor</li>
+<li>YAFU</li>
+</ul>
+</section><section id="factordb" class="slide level2">
+<h1>factordb</h1>
+<ul>
+<li><a href="http://factordb.com/">factordb</a></li>
+<li>輕鬆看看是不是質數，搞不好有人分過</li>
+</ul>
+</section><section id="factor" class="slide level2">
+<h1>factor</h1>
+<ul>
+<li>Linux 自帶小程式</li>
+</ul>
+</section><section id="yafu" class="slide level2">
+<h1>YAFU</h1>
+<ul>
+<li><a href="http://sourceforge.net/projects/yafu/">Yet Another Factoring Utility</a></li>
+<li>現成好用</li>
+<li>Fire-and-forgot</li>
+</ul>
+</section><section id="practice" class="slide level2">
+<h1>Practice</h1>
+</section><section id="m-太小" class="slide level2">
+<h1><span class="math">\(m\)</span> 太小</h1>
+<ul>
+<li><span class="math">\(c = m ^ e &lt; n\)</span></li>
+<li>直接開 <span class="math">\(e\)</span> 次方根就好</li>
+</ul>
+</section><section id="p-q-重複" class="slide level2">
+<h1><span class="math">\(p, q\)</span> 重複</h1>
+<ul>
+<li>做 <span class="math">\(\gcd\)</span> 就好</li>
+</ul>
+</section><section id="hastads-broadcast-attack" class="slide level2">
+<h1>Hastad's Broadcast Attack</h1>
+<ul>
+<li>假設你要傳訊息 <span class="math">\(m\)</span> 給若干人</li>
+<li>每個人有自己個 <span class="math">\((n_i, e_i)\)</span></li>
+<li>假設 <span class="math">\(e_i = 3, \forall i\)</span></li>
+<li>就傳啊？</li>
+</ul>
+</section><section id="hastads-broadcast-attack-1" class="slide level2">
+<h1>Hastad's Broadcast Attack</h1>
+<ul>
+<li>假設有三個人...</li>
+<li><span class="math">\(c_1 = m^3 \bmod n_1\)</span></li>
+<li><span class="math">\(c_2 = m^3 \bmod n_2\)</span></li>
+<li><span class="math">\(c_3 = m^3 \bmod n_3\)</span></li>
+<li>中國剩餘定理！</li>
+</ul>
+</section><section id="chinese-remainder-theorem" class="slide level2">
+<h1>Chinese Remainder Theorem</h1>
+<ul>
+<li>CRT</li>
+<li>韓信點兵</li>
+<li><span class="math">\(x \equiv a_i \pmod{m_i}\)</span></li>
+</ul>
+</section><section id="韓信點兵" class="slide level2">
+<h1>韓信點兵</h1>
+<ul>
+<li>有物不知其數</li>
+<li>三三數之剩二</li>
+<li>五五數之剩三</li>
+<li>七七數之剩二</li>
+<li>問物幾何？</li>
+</ul>
+</section><section id="crt-in-python" class="slide level2">
+<h1>CRT in Python</h1>
+<pre class="python"><code>from sympy.ntheory.modular import crt
+print crt([3, 5, 7], [2, 3, 2]) # (23, 105)</code></pre>
+</section><section id="related-message-attack" class="slide level2">
+<h1>Related Message Attack</h1>
+<ul>
+<li><span class="math">\(c_1 = m_1^3 \bmod n_1\)</span></li>
+<li><span class="math">\(c_2 = m_2^3 \bmod n_2\)</span></li>
+<li><span class="math">\(m_2 = f(m_1)\)</span></li>
+<li><code>...; uid=100</code></li>
+<li><code>...; uid=101</code></li>
+<li>Leave as homework :P</li>
+</ul>
+</section><section id="blinding" class="slide level2">
+<h1>Blinding</h1>
+<ul>
+<li>Practice again</li>
+<li>不要偷看下一頁 QQ</li>
+</ul>
+</section><section id="blinding-1" class="slide level2">
+<h1>Blinding</h1>
+<ul>
+<li>拒絕解出 flag</li>
+<li><span class="math">\(c = m^e \bmod n\)</span></li>
+<li><span class="math">\(c&#39; \equiv 2^e \times m^e \equiv (2m)^e \pmod{n}\)</span></li>
+<li><span class="math">\(c&#39;^d = 2m \bmod n\)</span></li>
+<li>乘上 2 的模逆</li>
+</ul>
+</section><section id="更多攻擊" class="slide level2">
+<h1>更多攻擊</h1>
+<ul>
+<li><a href="http://crypto.stanford.edu/~dabo/papers/RSA-survey.pdf">Twenty Years of Attacks on RSA</a></li>
+</ul>
+</section></section>
+<section><section id="hash-function" class="titleslide slide level1"><h1>Hash Function</h1></section><section id="hash-function-1" class="slide level2">
+<h1>Hash Function</h1>
+<ul>
+<li><span class="math">\(h(x) = y\)</span></li>
+<li>一樣的 <span class="math">\(x\)</span> 會變出一樣的 <span class="math">\(y\)</span></li>
+<li>一樣的 <span class="math">\(y\)</span> 不代表一樣的 <span class="math">\(x\)</span></li>
+<li>某種特徵值的概念</li>
+<li>Hash table，精神上 <span class="math">\(O(1)\)</span></li>
+</ul>
+</section><section id="hash-table" class="slide level2">
+<h1>Hash Table</h1>
+<figure>
+<img src="img/640px-Hash_table_5_0_1_1_1_1_1_LL.svg.png" />
+</figure>
+</section><section id="碰撞" class="slide level2">
+<h1>碰撞</h1>
+<ul>
+<li>迸！</li>
+<li>Separate chaining</li>
+<li>Open addressing</li>
+<li>總之會變慢，大部份會退化成 <span class="math">\(O(n^2)\)</span></li>
+</ul>
+</section><section id="運氣" class="slide level2">
+<h1>運氣</h1>
+<ul>
+<li>運氣不好的人才會碰撞（啥</li>
+<li>根據 Hash 算法構造碰撞</li>
+<li>DOS Attack</li>
+</ul>
+</section><section id="碰撞-in-python" class="slide level2">
+<h1>碰撞 in Python</h1>
+<pre class="python"><code>n = 20000
+d = 2 ** 64 - 1
+h = {}
+for i in xrange(n):
+    h[i * d] = i</code></pre>
+</section><section id="各種碰撞" class="slide level2">
+<h1>各種碰撞</h1>
+<ul>
+<li>基本上各種語言都劇烈中招</li>
+<li>PHP, ASP, Python, Ruby, C++, Java...</li>
+<li>引入隨機成分？</li>
+<li>撞太慘就退化回 BST</li>
+</ul>
+</section><section id="cryptographic-hash-function" class="slide level2">
+<h1>Cryptographic Hash Function</h1>
+<p>希望下列事情難以做到：</p>
+<ol type="1">
+<li>竄改訊息 hash 不變</li>
+<li>給 hash 變出訊息</li>
+<li>找到兩個不同訊息 hash 一樣</li>
+</ol>
+</section><section id="那些常見-hash" class="slide level2">
+<h1>那些常見 hash</h1>
+<ul>
+<li>MD5</li>
+<li>SHA1</li>
+<li>切塊亂攪一通</li>
+</ul>
+</section><section id="那些常見用途" class="slide level2">
+<h1>那些常見用途</h1>
+<ul>
+<li>存密碼</li>
+<li>存密碼</li>
+<li>存密碼</li>
+<li>Message Authentication Code (MAC)</li>
+</ul>
+</section><section id="存密碼" class="slide level2">
+<h1>存密碼</h1>
+<ul>
+<li>明文存密碼很可怕</li>
+<li>明文存密碼很可怕</li>
+<li>明文存密碼很可怕</li>
+<li>反正不太會撞，存 hash 值就好</li>
+<li>Rainbow Table</li>
+</ul>
+</section><section id="rainbow-table" class="slide level2">
+<h1>Rainbow Table</h1>
+<ul>
+<li>同樣爛密碼很常見</li>
+<li>一樣的東西 hash 還是一樣</li>
+<li>預先見好常見密碼搭配常見 hash 的表</li>
+</ul>
+</section><section id="salt" class="slide level2">
+<h1>Salt</h1>
+<ul>
+<li>加點渣渣進密碼再 hash</li>
+<li>整個站都用同一個渣渣？</li>
+<li>每個密碼都用不同渣渣！</li>
+<li>太爛的密碼還是可以暴力</li>
+<li>GPU 的力量</li>
+<li>Key Derivation Function</li>
+</ul>
+</section><section id="length-extension-attack" class="slide level2">
+<h1>Length Extension Attack</h1>
+<ul>
+<li>知道 <span class="math">\(H(m_1)\)</span></li>
+<li>變出 <span class="math">\(H(m_1 \concat m_2)\)</span></li>
+<li>有 padding 的時候要自己補在中間</li>
+<li><a href="https://github.com/bwall/HashPump">HashPump</a></li>
+</ul>
+</section><section id="實作" class="slide level2">
+<h1>實作？</h1>
+<ul>
+<li>這份 php 有什麼問題？</li>
+</ul>
+<pre class="php"><code>if (md5($a) == md5($b)) success();</code></pre>
+</section></section>
+    </div>
+  </div>
+
+
+  <script src="reveal.js/lib/js/head.min.js"></script>
+  <script src="reveal.js/js/reveal.min.js"></script>
+
+  <script>
+
+      // Full list of configuration options available here:
+      // https://github.com/hakimel/reveal.js#configuration
+      Reveal.initialize({
+        controls: true,
+        progress: true,
+        history: true,
+        center: true,
+        slideNumber: true,
+        theme: 'shik', // available themes are in /css/theme
+        transition: Reveal.getQueryHash().transition || 'default', // default/cube/page/concave/zoom/linear/fade/none
+
+        // Optional libraries used to extend on reveal.js
+        dependencies: [
+          { src: 'reveal.js/lib/js/classList.js', condition: function() { return !document.body.classList; } },
+          { src: 'reveal.js/plugin/zoom-js/zoom.js', async: true, condition: function() { return !!document.body.classList; } },
+          { src: 'reveal.js/plugin/notes/notes.js', async: true, condition: function() { return !!document.body.classList; } },
+          { src: 'highlightjs/highlight.pack.js', async: true, callback: function() { hljs.initHighlightingOnLoad(); } },
+//          { src: 'reveal.js/plugin/search/search.js', async: true, condition: function() { return !!document.body.classList; }, }
+//          { src: 'reveal.js/plugin/remotes/remotes.js', async: true, condition: function() { return !!document.body.classList; } }
+]});
+    </script>
+    </body>
+</html>

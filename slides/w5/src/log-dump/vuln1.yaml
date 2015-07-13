@@ -1,0 +1,7 @@
+
+watch:
+  - address: $esp-40
+    size: 60
+
+  - address: 0x804a000
+    size: 20

@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="generator" content="pandoc">
+  <title>Misc</title>
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <link rel="stylesheet" href="reveal.js/lib/css/tomorrow-night-bright.css">
+  <link rel="stylesheet" href="reveal.js/css/reveal.min.css"/>
+    <style type="text/css">code{white-space: pre;}</style>
+    <link rel="stylesheet" href="reveal.js/css/theme/simple.css" id="theme">
+<!--<link rel="stylesheet" media="print" href="reveal.js/css/print/pdf.css" />-->
+<!-- If the query includes 'print-pdf', include the PDF print sheet -->
+<script>
+  if( window.location.search.match( /print-pdf/gi ) ) {
+    var link = document.createElement( 'link' );
+    link.rel = 'stylesheet';
+    link.type = 'text/css';
+    link.href = 'reveal.js/css/print/pdf.css';
+    document.getElementsByTagName( 'head' )[0].appendChild( link );
+  }
+</script>
+  <!--[if lt IE 9]>
+  <script src="reveal.js/lib/js/html5shiv.js"></script>
+  <![endif]-->
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+
+<section>
+    <h1 class="title">Misc</h1>
+    <h3 class="date"></h3>
+</section>
+
+<section><section id="pwntools" class="titleslide slide level1"><h1>pwntools</h1></section><section id="installation" class="slide level2">
+<h1>Installation</h1>
+<ul>
+<li>python</li>
+<li>pip</li>
+<li><a href="https://github.com/Gallopsled/pwntools.git">pwntools</a></li>
+</ul>
+</section><section id="python" class="slide level2">
+<h1>python</h1>
+<ul>
+<li>pyenv is useful for non-root user</li>
+<li><code>https://github.com/yyuu/pyenv</code></li>
+<li><code>pyenv install 2.7.8</code></li>
+<li><code>pyenv versions</code></li>
+<li><code>pyenv global 2.7.8</code></li>
+<li><code>pyenv rehash</code></li>
+</ul>
+</section><section id="pwntools-1" class="slide level2">
+<h1>pwntools</h1>
+<ul>
+<li><code>https://github.com/Gallopsled/pwntools.git</code></li>
+<li><code>http://pwntools.readthedocs.org/en/latest/</code></li>
+</ul>
+</section><section id="useful-toolkits" class="slide level2">
+<h1>Useful toolkits</h1>
+<ul>
+<li>remote</li>
+<li>asm / disasm</li>
+<li>ELF</li>
+<li>rop</li>
+<li>dynELF</li>
+</ul>
+</section></section>
+<section><section id="x86-64" class="titleslide slide level1"><h1>x86-64</h1></section><section id="bit-x86-architecture" class="slide level2">
+<h1>64-bit x86 Architecture</h1>
+<ul>
+<li>Registers</li>
+<li>Stack</li>
+<li>Memory address</li>
+<li>System calls</li>
+<li>Calling conventions</li>
+</ul>
+</section><section id="registers" class="slide level2">
+<h1>Registers</h1>
+<ul>
+<li><code>rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi</code></li>
+<li><code>r8, r9, r10, r11, r12, r13, r14, r15</code></li>
+<li>32-bit <code>r8d, r9d, ..., r15d</code></li>
+</ul>
+</section><section id="stack" class="slide level2">
+<h1>Stack</h1>
+<ul>
+<li>Each stack entry is 64-bit wide</li>
+</ul>
+</section><section id="move-qword-to-a-64-bit-registor" class="slide level2">
+<h1>Move QWORD to a 64-bit Registor</h1>
+<ul>
+<li><code>mov rax, 0xdeadbeef123</code> in NASM, but actually <code>movabs rax, 0xdeadbeef123</code> in objdump, gdb</li>
+</ul>
+</section><section id="memory-address" class="slide level2">
+<h1>Memory Address</h1>
+<ul>
+<li>64-bit address, also may include ASLR</li>
+<li>Example:
+<ul>
+<li>Code .text <code>00400000</code>, .data <code>00600000</code></li>
+<li>Libc <code>7f6f38e1a000</code></li>
+<li>Heap <code>0230e000</code></li>
+<li>Stack <code>7fff627f6000</code></li>
+</ul></li>
+<li><code>gcc -pie -fPIE</code>
+<ul>
+<li>Code .text <code>7f2e8ec6a000</code>, .data <code>7f2e8ee6a000</code></li>
+<li>Libc <code>7f2e8e67f000</code></li>
+<li>Heap <code>7f2e8f262000</code></li>
+<li>Stack <code>7fff31602000</code></li>
+</ul></li>
+</ul>
+</section><section id="system-calls" class="slide level2">
+<h1>System Calls</h1>
+<ul>
+<li>Difference
+<ul>
+<li>System call numbers</li>
+<li>Registers</li>
+</ul></li>
+<li><a href="http://blog.rchapman.org/post/36801038863/linux-system-call-table-for-x86-64">Syscall table</a></li>
+</ul>
+<pre class="avrasm"><code>section .text
+global _start
+_start:
+  mov rax, 1
+  mov rdi, 1
+  mov rsi, str
+  mov rdx, 6
+  syscall
+
+  mov rax, 60
+  syscall
+str:
+  db &#39;hello&#39;,0xA</code></pre>
+</section><section id="calling-conventions-on-linux" class="slide level2">
+<h1>Calling conventions on Linux</h1>
+<ul>
+<li>Return value: <code>rax</code></li>
+<li><strong>Arguments:</strong> <code>rdi, rsi, rdx, rcx, r8, r9</code> and then stack</li>
+</ul>
+</section><section id="rop" class="slide level2">
+<h1>ROP</h1>
+<ul>
+<li>Quite difficult ...</li>
+<li>Need gadgets for controlling arguments</li>
+</ul>
+</section><section id="rop-example" class="slide level2">
+<h1>ROP Example</h1>
+<pre class="cpp"><code>#include &lt;stdio.h&gt;
+
+int main() {
+  char buf[8];
+  read(0, buf, 1024);
+  return 0;
+}</code></pre>
+</section><section id="use-pwntools" class="slide level2">
+<h1>Use pwntools</h1>
+<ul>
+<li>Assumed that we do not have libc.so.6 now</li>
+<li>Construct function calls</li>
+<li>Function calls combo</li>
+<li>Construct a leaker</li>
+<li>Resolve symbol, find <code>system()</code></li>
+<li>Construct a <code>system('/bin/sh')</code></li>
+</ul>
+</section></section>
+<section><section id="arm" class="titleslide slide level1"><h1>ARM</h1></section><section id="tools" class="slide level2">
+<h1>Tools</h1>
+<ul>
+<li>gcc-4.8-arm-linux-gnueabihf
+<ul>
+<li>arm-linux-gnueabihf-gcc-4.8</li>
+<li>arm-linux-gnueabihf-objdump</li>
+</ul></li>
+<li>g++-4.8-arm-linux-gnueabihf</li>
+<li>qemu
+<ul>
+<li>qemu-arm</li>
+<li>qemu-system-arm</li>
+</ul></li>
+<li>gdb-multiarch</li>
+<li>IDA &amp; armlinux_server</li>
+</ul>
+</section><section id="qemu-system" class="slide level2">
+<h1>qemu-system</h1>
+<ul>
+<li><a href="https://people.debian.org/~aurel32/qemu/">https://people.debian.org/~aurel32/qemu/</a></li>
+<li>qemu-system-arm -M versatilepb -kernel vmlinuz-3.2.0-4-versatile -initrd initrd.img-3.2.0-4-versatile -hda debian_wheezy_armel_standard.qcow2 -append &quot;root=/dev/sda1&quot; -nographic -redir tcp:2222::22 -redir tcp:23947::23946</li>
+<li>Login with root/root</li>
+</ul>
+</section><section id="qemu-user-gdb-multiarch" class="slide level2">
+<h1>qemu-user &amp; gdb-multiarch</h1>
+<ul>
+<li>Library needed: /usr/arm-linux-gnueabi/lib/</li>
+<li>qemu-arm -g 4444 -E LD_LIBRARY_PATH=/usr/arm-linux-gnueabi/lib /usr/arm-linux-gnueabi/lib/ld-2.19.so ./bina</li>
+<li>gdb-multiarch ./bina
+<ul>
+<li>target remote localhost:4444</li>
+</ul></li>
+</ul>
+</section><section id="demo" class="slide level2">
+<h1>Demo</h1>
+<ul>
+<li>Buffer overflow</li>
+<li>Jump to shellcode</li>
+</ul>
+</section></section>
+    </div>
+  </div>
+
+  <script src="reveal.js/lib/js/head.min.js"></script>
+  <script src="reveal.js/js/reveal.min.js"></script>
+
+  <script>
+
+      // Full list of configuration options available here:
+      // https://github.com/hakimel/reveal.js#configuration
+      Reveal.initialize({
+        controls: true,
+        progress: true,
+        history: true,
+        center: true,
+        theme: 'my', // available themes are in /css/theme
+        transition: 'linear', // default/cube/page/concave/zoom/linear/fade/none
+
+        // Optional libraries used to extend on reveal.js
+        dependencies: [
+          { src: 'reveal.js/lib/js/classList.js', condition: function() { return !document.body.classList; } },
+          { src: 'reveal.js/plugin/highlight/highlight.js', async: true, callback: function() { hljs.initHighlightingOnLoad(); } },
+          { src: 'reveal.js/plugin/zoom-js/zoom.js', async: true, condition: function() { return !!document.body.classList; } },
+          { src: 'reveal.js/plugin/notes/notes.js', async: true, condition: function() { return !!document.body.classList; } },
+//          { src: 'reveal.js/plugin/search/search.js', async: true, condition: function() { return !!document.body.classList; }, }
+//          { src: 'reveal.js/plugin/remotes/remotes.js', async: true, condition: function() { return !!document.body.classList; } }
+]});
+    </script>
+  </body>
+</html>

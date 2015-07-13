@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="generator" content="pandoc">
+  <title>Break the Heap</title>
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <link rel="stylesheet" href="reveal.js/lib/css/tomorrow-night-bright.css">
+  <link rel="stylesheet" href="reveal.js/css/reveal.min.css"/>
+    <style type="text/css">code{white-space: pre;}</style>
+    <link rel="stylesheet" href="reveal.js/css/theme/simple.css" id="theme">
+  <link rel="stylesheet" media="print" href="reveal.js/css/print/pdf.css" />
+  <!--[if lt IE 9]>
+  <script src="reveal.js/lib/js/html5shiv.js"></script>
+  <![endif]-->
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+
+<section>
+    <h1 class="title">Break the Heap</h1>
+    <h3 class="date"></h3>
+</section>
+
+<section><section id="glibc-heap" class="titleslide slide level1"><h1>GLibc Heap</h1></section><section id="whats-heap" class="slide level2">
+<h1>What's Heap</h1>
+<ul>
+<li>C Library 裡動態配置記憶體的一種方法</li>
+<li><code>malloc()</code>, <code>free()</code></li>
+<li>記憶體的配置、釋放，由 libc 內部實作</li>
+</ul>
+</section><section id="gnu-libc-source" class="slide level2">
+<h1>GNU Libc Source</h1>
+<ul>
+<li><a href="http://code.woboq.org/userspace/glibc/malloc/malloc.c.html">glibc/malloc/malloc.c</a></li>
+<li>複雜無比</li>
+</ul>
+</section><section id="overview" class="slide level2">
+<h1>Overview</h1>
+<ul>
+<li>Heap 管理配置出來的記憶體</li>
+<li><code>free</code> 掉的片段會被收集起來，之後可以再次給 <code>malloc</code> 使用</li>
+<li>使用 linked list 管理這些片段</li>
+</ul>
+</section><section id="functions" class="slide level2">
+<h1>Functions</h1>
+<ul>
+<li><code>malloc</code> → <code>__libc_malloc</code> → <code>_int_malloc</code></li>
+<li><code>free</code> → <code>__libc_free</code> → <code>_int_free</code></li>
+</ul>
+</section><section id="doug-leas-malloc" class="slide level2">
+<h1>Doug Lea's malloc</h1>
+<ul>
+<li>配置的記憶體 + info = <strong>chunk</strong></li>
+<li>用多個 linked list 記錄可用的 chunk，每個 list 的 head 為一個 <strong>bin</strong></li>
+<li>Libc 裡是 ptmalloc，是基於 dlmalloc 實作的</li>
+</ul>
+</section><section id="chunk" class="slide level2">
+<h1>Chunk</h1>
+<ul>
+<li>配置記憶體的單位為 chunk</li>
+</ul>
+<pre class="cpp"><code>struct malloc_chunk {
+ 
+  INTERNAL_SIZE_T      prev_size;  /* 前一個 chunk size */
+  INTERNAL_SIZE_T      size;       /* 本 chunk size */
+ 
+  struct malloc_chunk* fd;         
+  struct malloc_chunk* bk;
+ 
+  struct malloc_chunk* fd_nextsize; 
+  struct malloc_chunk* bk_nextsize;
+};</code></pre>
+</section><section id="chunk-inuse" class="slide level2">
+<h1>Chunk (inuse)</h1>
+<figure>
+<img src="imgs/chunk_malloced.png" />
+</figure>
+</section><section id="chunk-inuse-1" class="slide level2">
+<h1>Chunk (inuse)</h1>
+<ul>
+<li><code>mem_ptr</code> 是 malloc 回傳的指標，可以使用的記憶體位置</li>
+<li>malloc 時指定的大小為 <code>sz</code>，會得到一個大小為 <code>((sz + 7) &amp; 7) + 8</code> 的 chunk</li>
+<li>chunk 的大小和對齊位置皆為 8 的倍數</li>
+</ul>
+</section><section id="chunk-freed" class="slide level2">
+<h1>Chunk (freed)</h1>
+<figure>
+<img src="imgs/chunk_freed.png" />
+</figure>
+</section><section id="chunk-freed-1" class="slide level2">
+<h1>Chunk (freed)</h1>
+<ul>
+<li><code>fd</code> <strong>不是指向 next_chunk</strong>，是在 free-chunk list 裡的下一個 chunk</li>
+<li><code>bk</code> 是 list 裡的上一個 chunk</li>
+</ul>
+</section><section id="malloc-free" class="slide level2">
+<h1>malloc &amp; free</h1>
+<ul>
+<li>malloc 從 list 裡拿出可用的 chunk；free 時放回 list <img src="imgs/free_and_malloc.png" /></li>
+</ul>
+</section><section id="brk" class="slide level2">
+<h1>brk()</h1>
+<ul>
+<li>malloc 時 list 裡不一定有可以用的 chunk
+<ul>
+<li>還沒有 freed chunk</li>
+<li>list 裡的 chunk 都不夠大</li>
+</ul></li>
+<li>malloc 中會使用 <code>brk()</code> 增加 data segment 的大小，然後配置新的 chunk</li>
+<li>原則上，<strong>chunk 在記憶體中是連續的</strong>
+<ul>
+<li>因此一個 chunk 上的溢出有可能會寫到下一個 chunk</li>
+</ul></li>
+</ul>
+</section><section id="合併-free-chunk" class="slide level2">
+<h1>合併 free chunk</h1>
+<ul>
+<li>為了避免太多破碎的 chunk，如果 freed chunk 在記憶體中是連續的，則合併起來</li>
+<li>free 時檢查前後兩個 chunk 是不是 inuse，若否則可合併</li>
+</ul>
+</section><section id="size" class="slide level2">
+<h1>Size</h1>
+<ul>
+<li>Size 是 8-bytes 對齊，最低的 3 bits 有特殊用途
+<ul>
+<li><code>PREV_INUSE 0x1</code> 前一個 chunk 是使用中 (非 freed)</li>
+<li><code>IS_MMAPPED 0x2</code> 這個 chunk 是用 mmap() 建立的</li>
+<li><code>NON_MAIN_ARENA 0x4</code> 這個 chunk 所在的 heap 是不是在 main_arena 內</li>
+</ul></li>
+</ul>
+</section><section id="合併-free-chunk-1" class="slide level2">
+<h1>合併 free chunk</h1>
+<ul>
+<li>檢查 <code>me-&gt;size &amp; PREV_INUSE</code>，前一個 chunk</li>
+<li>檢查 <code>(next + nextsize)-&gt;size &amp; PREV_INUSE</code>，後一個 chunk</li>
+</ul>
+</section><section id="合併-free-chunk-2" class="slide level2">
+<h1>合併 free chunk</h1>
+<pre class="cpp"><code>/* consolidate backward */
+if (!prev_inuse(p)) {
+  prevsize = p-&gt;prev_size;
+  size += prevsize;
+  p = chunk_at_offset(p, -((long) prevsize)); /* 前一個 chunk */
+  unlink(p, bck, fwd);
+}
+
+if (nextchunk != av-&gt;top) {
+  /* get and clear inuse bit */
+  nextinuse = inuse_bit_at_offset(nextchunk, nextsize); 
+  /* consolidate forward */
+  if (!nextinuse) {
+    unlink(nextchunk, bck, fwd);
+    size += nextsize;
+  }</code></pre>
+</section><section id="unlink" class="slide level2">
+<h1>unlink()</h1>
+<ul>
+<li>從 linked list 裡移除一個 chunk</li>
+</ul>
+<pre class="no-highlight"><code>#define unlink(P, BK, FD) {                                   \
+  FD = P-&gt;fd;                                                 \
+  BK = P-&gt;bk;                                                 \
+  FD-&gt;bk = BK;                                                \
+  BK-&gt;fd = FD;                                                \
+}</code></pre>
+</section><section id="malloc_state" class="slide level2">
+<h1>malloc_state</h1>
+<pre class="cpp"><code>struct malloc_state 
+{
+  mutex_t mutex;
+  int flags;                        /* =max_fast */
+  mfastbinptr fastbinsY[NFASTBINS]; /* fastbins */
+  mchunkptr top;                    /* topchunk */
+  mchunkptr last_remainder;         /* spliting remains */
+ 
+  mchunkptr bins[NBINS * 2 - 2];    /* normal bins */
+  unsigned int binmap[BINMAPSIZE];
+ 
+  struct malloc_state *next;
+  struct malloc_state *next_free;
+  INTERNAL_SIZE_T system_mem;
+  INTERNAL_SIZE_T max_system_mem;
+};</code></pre>
+</section><section id="malloc_state-1" class="slide level2">
+<h1>malloc_state</h1>
+<ul>
+<li>用來儲存 heap 當前的狀態</li>
+<li><strong>Bins</strong> — heads of linked lists</li>
+</ul>
+</section><section id="bins" class="slide level2">
+<h1>Bins</h1>
+<ul>
+<li>用來記住 linked list 的 head</li>
+<li>glibc 實作裡，bins 分為三種
+<ul>
+<li>fastbin</li>
+<li>smallbin</li>
+<li>largebin</li>
+</ul></li>
+<li>目的: malloc 時可以快速找到大小適合的 chunk</li>
+</ul>
+</section><section id="malloc-原則" class="slide level2">
+<h1>malloc 原則</h1>
+<ul>
+<li>照以下順序在 bin 裡尋找可用的 chunk，每種 bin 有各自的使用限制
+<ul>
+<li>fastbin: size ≤ max_fast (default: 64)</li>
+<li>smallbin: size ≤ 512B</li>
+<li>largebin: size ≤ 128KiB</li>
+</ul></li>
+</ul>
+</section><section id="malloc-原則-1" class="slide level2">
+<h1>malloc 原則</h1>
+<ul>
+<li>如果都沒有可用的 chunk，<a href="http://code.woboq.org/userspace/glibc/malloc/malloc.c.html#3738">use_top</a> 裡使用 top_chunk</li>
+<li>例外: size &gt; 128 * 1024 bytes
+<ul>
+<li>直接用 <code>mmap()</code> 配置需要的大小</li>
+<li>這時 size 的 IS_MMAPPED bit 被設為 1</li>
+</ul></li>
+</ul>
+</section><section id="fastbin" class="slide level2">
+<h1>Fastbin</h1>
+<ul>
+<li>Free chunk 時，如果 chunk size &lt;= 72，會被放進 fastbin</li>
+<li><code>fastbin_index = (size &gt;&gt; 3) - 2</code></li>
+<li>不取消 INUSE bit，即不參與 freed chunk 的合併</li>
+<li>Singly linked list</li>
+</ul>
+<pre class="cpp"><code>idx = fastbin_index(size);
+fb = &amp;fastbin (av, idx);
+p-&gt;fd = *fb;
+*fb = p;</code></pre>
+</section><section id="fastbin-1" class="slide level2">
+<h1>Fastbin</h1>
+<ul>
+<li>malloc 時直接拿 bin 裡的第一個</li>
+<li>LIFO (last in, first out)</li>
+</ul>
+<pre class="cpp"><code>idx = fastbin_index (nb);
+fb = &amp;fastbin (av, idx);
+victim = fb-&gt;fd;
+fb-&gt;fd = victim-&gt;fd;
+return victim;</code></pre>
+</section><section id="smallbin" class="slide level2">
+<h1>Smallbin</h1>
+<ul>
+<li>size &lt;= 512 時，使用 smallbin</li>
+<li>為 normal bins 中前 64 (512/8) 個</li>
+<li>每種 size 有對應的 bin，每個 bin 中存的 chunk 大小都相同 (用 double linked list 維護)</li>
+<li>malloc 時先找對應的 bin 裡有沒有可用的 chunk</li>
+</ul>
+</section><section id="largebin" class="slide level2">
+<h1>Largebin</h1>
+<ul>
+<li>chunk size &gt; 512 時，會被放進 largebin</li>
+<li><code>largebin_index_32(sz)</code></li>
+<li>大約是指數遞增的 bin range</li>
+</ul>
+<pre class="no-highlight"><code>64 bins of spacing size 8
+32 bins of spacing size 64
+16 bins of spacing size 512
+ 8 bins of spacing size 4096
+ 4 bins of spacing size 32768
+ 2 bins of spacing size 262144
+ 1 bin  of spacing size what&#39;s left</code></pre>
+</section><section id="largebin-1" class="slide level2">
+<h1>Largebin</h1>
+<ul>
+<li>因為 bin 裡的 chunk 大小不一，用 sorted list 存</li>
+<li>chunk 由小到大排列</li>
+<li><code>fd_nextsize</code>, <code>bk_nextsize</code> 指向下一個大小不同的 chunk，用來加快 search</li>
+</ul>
+</section><section id="unsorted-bin" class="slide level2">
+<h1>Unsorted bin</h1>
+<ul>
+<li>free chunk 後，chunk 並不會立刻放進正確的 bin (fastbin 除外)，而是放進 unsorted bin: <code>bin[1]</code>
+<ul>
+<li>整理的時間太長</li>
+<li>有可能被合併，合併後還會再被移出 bin，等於做白工</li>
+</ul></li>
+<li>unsorted bin 在 malloc 「找不到恰好符合的 chunk」時，進行整理</li>
+</ul>
+</section><section id="best-fit-chunk" class="slide level2">
+<h1>Best Fit Chunk</h1>
+<ul>
+<li>malloc 時有可能沒有大小剛好的 chunk</li>
+<li>整理一下 unsorted bin，如果有剛好 fit 的就順手拿走</li>
+<li>否則之後再依序掃描 normal bins，找到最小可用 chunk</li>
+</ul>
+</section><section id="top-chunk" class="slide level2">
+<h1>Top Chunk</h1>
+<ul>
+<li>記憶體中位置最大的 chunk</li>
+<li>可以任意調整大小，因為其後沒有別的 chunk 了</li>
+<li>在沒有夠大的 free chunk 可以用時，會使用 top chunk</li>
+<li>Top chunk 縮小時，多出的部份會成為新的 top chunk</li>
+</ul>
+</section><section id="last-remainder" class="slide level2">
+<h1>Last Remainder</h1>
+<ul>
+<li>Free chunk 被重新拿出來使用時，如果 chunk size 比 request size 大會 split 成兩個 chunk</li>
+<li>Realloc 時也有可能 split chunk</li>
+<li>last_remainder 記錄前一次 split 後剩下的部份</li>
+<li>malloc 在沒有大小剛好的 chunk 時，會先檢查 last_remainder 夠不夠大
+<ul>
+<li>如果足夠則會切下一部份，剩下的成為新的 last_remainder</li>
+<li>是對連續小塊 malloc 所做的優化</li>
+</ul></li>
+</ul>
+</section></section>
+<section><section id="break-the-heap" class="titleslide slide level1"><h1>Break the Heap</h1></section><section id="review-stack-buffer-overflow" class="slide level2">
+<h1>Review: Stack Buffer Overflow</h1>
+<ul>
+<li>Target 是 local variable (array)</li>
+<li>可以直接蓋掉 return address，控制 flow</li>
+<li>可能有 stack guard，可能要先有某些 information leaking</li>
+</ul>
+</section><section id="heap-overflow" class="slide level2">
+<h1>Heap Overflow</h1>
+<ul>
+<li>Target 是 malloc 得到的 buffer</li>
+<li>例如: malloc(100) 但寫入超過 100 bytes</li>
+<li>無法直接蓋到 return address 或 GOT</li>
+</ul>
+</section><section id="idea" class="slide level2">
+<h1>Idea</h1>
+<ul>
+<li>維護 Heap 的各種 structures、meta-data 是和 buffer 放在一起的</li>
+<li>寫掉這些 structure，之後再使用 malloc 或 free 等操作時，有辦法再寫入其它地方</li>
+<li>有可能不需要任何 information leaking</li>
+<li>但新的 glibc 裡有各種檢查，需要想辦法繞過</li>
+</ul>
+</section><section id="example-fake" class="slide level2">
+<h1>Example (fake)</h1>
+<pre class="cpp"><code>#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+
+int main(int argc, char **argv) {
+  char *p, *q;
+  p = malloc(256);
+  q = malloc(256);
+  gets(p);
+  free(q);
+  free(p);
+  return 0;
+}</code></pre>
+</section><section id="results" class="slide level2">
+<h1>Results</h1>
+<pre class="no-highlight"><code>$ perl -e &#39;print &quot;A&quot;x256,&quot;AAAAAAAAAAAAAAA&quot;&#39; | ltrace ./example
+__libc_start_main(0x804847d, 1, 0xffffdc64, 0x80484e0 &lt;unfinished ...&gt;
+malloc(256) = 0x804b008
+malloc(256) = 0x804b110
+gets(0x804b008, 0xffffdc64, 0xffffdc6c, 0xf7e5e39d) = 0x804b008
+free(0x804b110 &lt;no return ...&gt;
+--- SIGSEGV (Segmentation fault) ---
++++ killed by SIGSEGV +++</code></pre>
+</section><section id="sigsegv-in-free" class="slide level2">
+<h1>SIGSEGV in free()</h1>
+<ul>
+<li>下個 chunk 的 size 被蓋掉 (=0x41414140)</li>
+<li>nextchunk 的位置不正確 (=0x804b108+0x41414140)</li>
+<li>nextsize = nextchunk-&gt;size 時 segmentation fault</li>
+</ul>
+<pre><code>nextchunk = chunk_at_offset(p, size);
+nextsize = chunksize(nextchunk);</code></pre>
+</section><section id="next-step" class="slide level2">
+<h1>Next step</h1>
+<ul>
+<li>覆蓋正確的 size，使得 nextchunk 落在可控制範圍</li>
+<li>控制好正確的 prevsize</li>
+</ul>
+<pre><code>/* consolidate backward */
+if (!prev_inuse(p)) {
+  prevsize = p-&gt;prev_size;
+  size += prevsize;
+  p = chunk_at_offset(p, -((long) prevsize));
+  unlink(p, bck, fwd);
+}</code></pre>
+</section><section id="exploit-unlink" class="slide level2">
+<h1>Exploit unlink()</h1>
+<ul>
+<li>傳入 <code>unlink(p)</code> 的 chunk p，內容是可以控制的</li>
+<li>利用 <code>FD-&gt;bk = BK</code> 和 <code>BK-&gt;fd = FD</code>，可以同時寫入兩個目標</li>
+</ul>
+<pre class="no-highlight"><code>#define unlink(P, BK, FD) {                                   \
+  FD = P-&gt;fd;                                                 \
+  BK = P-&gt;bk;                                                 \
+  FD-&gt;bk = BK;                                                \
+  BK-&gt;fd = FD;                                                \
+}</code></pre>
+</section><section id="exploit-unlink-1" class="slide level2">
+<h1>Exploit unlink()</h1>
+<ul>
+<li>控制 P 的內容
+<ul>
+<li><code>FD = P-&gt;fd = free_GOT - 12</code></li>
+<li><code>BK = P-&gt;bk = shellcode</code></li>
+</ul></li>
+</ul>
+<pre class="no-highlight"><code>#define unlink(P, BK, FD) {                                   \
+  FD = P-&gt;fd;                                                 \
+  BK = P-&gt;bk;                                                 \
+  FD-&gt;bk = BK;                                                \
+  BK-&gt;fd = FD;                                                \
+}
+
+struct malloc_chunk {
+  INTERNAL_SIZE_T      prev_size; 
+  INTERNAL_SIZE_T      size;       
+  struct malloc_chunk* fd;         
+  struct malloc_chunk* bk;
+}
+</code></pre>
+</section><section id="exploit-unlink-2" class="slide level2">
+<h1>Exploit unlink()</h1>
+<ul>
+<li>寫掉 free_GOT <code>FD-&gt;bk = *(FD + 12) = *free_GOT = shellcode</code></li>
+<li>也會破壞一部份 shellcode[8:12]: <code>BK-&gt;fd = FD</code></li>
+</ul>
+<pre class="no-highlight"><code>#define unlink(P, BK, FD) {                                   \
+  FD = P-&gt;fd;                                                 \
+  BK = P-&gt;bk;                                                 \
+  FD-&gt;bk = BK;                                                \
+  BK-&gt;fd = FD;                                                \
+}
+
+struct malloc_chunk {
+  INTERNAL_SIZE_T      prev_size; 
+  INTERNAL_SIZE_T      size;       
+  struct malloc_chunk* fd;         
+  struct malloc_chunk* bk;
+}
+</code></pre>
+</section><section id="exploit-unlink-3" class="slide level2">
+<h1>Exploit unlink()</h1>
+<ul>
+<li>之後 free(p) 時，就會變成跳到 shellcode</li>
+<li>shellcode 可以放在 p 上，ASLR 沒全開時，heap 的位置是固定的</li>
+<li>shellcode 有 4 個 bytes 會被破壞，但可以用 jmp 跳過</li>
+</ul>
+<pre class="cpp"><code>#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+
+int main(int argc, char **argv) {
+  char *p, *q;
+  p = malloc(256);
+  q = malloc(256);
+  gets(p);
+  free(q);
+  free(p);
+  return 0;
+}</code></pre>
+</section><section id="the-truth" class="slide level2">
+<h1>The Truth</h1>
+<pre class="no-highlight"><code>#define unlink(P, BK, FD) {                                \
+  FD = P-&gt;fd;                                              \
+  BK = P-&gt;bk;                                              \
+  if (FD-&gt;bk != P || BK-&gt;fd != P)                          \
+    malloc_printerr (check_action, &quot;corrupted d...&quot;, P);   \
+  else {                                                   \
+    FD-&gt;bk = BK;                                           \
+    BK-&gt;fd = FD;                                           \
+  }                                                        \
+}</code></pre>
+</section><section id="hardened-unlink" class="slide level2">
+<h1>Hardened unlink()</h1>
+<ul>
+<li>較新的 glibc (&gt;2.3.5) 中增加了很多檢查</li>
+<li><code>P-&gt;fd-&gt;bk</code> 和 <code>P-&gt;bk-&gt;fd</code> 必須指回 <code>P</code> (因為是 double linked list)</li>
+<li>但沒道理可以先控制好這兩個 pointer 的值... <br>如果可以，表示已經能對 target 任意寫入了</li>
+</ul>
+</section></section>
+<section><section id="use-after-free" class="titleslide slide level1"><h1>Use After Free</h1></section><section id="use-after-free-1" class="slide level2">
+<h1>Use After Free</h1>
+<ul>
+<li>相對簡單，而且能有效的利用</li>
+<li>根據 &quot;use&quot; 的方法，有機會造成任意讀取、寫入，或再一次 buffer overflow</li>
+<li>條件
+<ul>
+<li>free 掉某個 pointer p 之後，p 還會被繼續使用</li>
+<li>free 後可執行一個可控大小的 malloc</li>
+</ul></li>
+</ul>
+</section><section id="idea-1" class="slide level2">
+<h1>Idea</h1>
+<ul>
+<li>被 free 掉的 chunk 會被放進對應的 bin</li>
+<li>之後 malloc 如果要求一樣大小 (或小一點) 的 chunk，就會被拿出來</li>
+<li>這時兩個 pointer 會指向同一塊記憶體，交互作用下會造成其它問題</li>
+</ul>
+<figure>
+<img src="imgs/use_after_free.png" />
+</figure>
+</section><section id="practice" class="slide level2">
+<h1>Practice</h1>
+<p><a href="src/prison.tar.gz">Binary &amp; Source</a></p>
+</section><section id="vulnerability" class="slide level2">
+<h1>Vulnerability</h1>
+<ul>
+<li>存在某個 use after free 漏洞，where?</li>
+</ul>
+</section><section id="malloc" class="slide level2">
+<h1>malloc</h1>
+<ul>
+<li>如何 malloc? Size 應該要是多少?</li>
+<li>造成的結果?</li>
+</ul>
+</section><section id="利用-collision-的指標" class="slide level2">
+<h1>利用 collision 的指標</h1>
+<ul>
+<li>任意讀取?</li>
+<li>任意寫入?</li>
+</ul>
+</section><section id="got-hijack" class="slide level2">
+<h1>GOT hijack</h1>
+<ul>
+<li>Which?</li>
+</ul>
+</section></section>
+<section><section id="the-malloc-maleficarum" class="titleslide slide level1"><h1>The Malloc Maleficarum</h1></section><section id="reference" class="slide level2">
+<h1>Reference</h1>
+<p><a href="http://packetstormsecurity.com/files/view/40638/MallocMaleficarum.txt">The Malloc Maleficarum</a></p>
+</section><section id="malloc-exploitation-techniques" class="slide level2">
+<h1>Malloc Exploitation Techniques</h1>
+<ul>
+<li>The House of Prime</li>
+<li>The House of Mind</li>
+<li>The House of Force</li>
+<li>The House of Lore</li>
+<li>The House of Spirit</li>
+</ul>
+</section><section id="the-house-of-prime" class="slide level2">
+<h1>The House of Prime</h1>
+<ul>
+<li>條件: 兩次可控大小的 free()，一次 malloc()</li>
+<li>目前的 glibc 版本已經無法使用</li>
+</ul>
+</section><section id="step1-改大-max_fast" class="slide level2">
+<h1>Step1: 改大 max_fast</h1>
+<ul>
+<li><code>free(p)</code> 一個大小為 8 的 chunk，chunk size 可能是由之前的 heap overflow 造成的</li>
+<li>根據 <code>fastbin_index(8)</code>，這個 chunk 會被放進 <code>fastbins[-1]</code></li>
+<li>但這個位置其實是 <code>max_fast</code>，會把它改成 <code>p</code>，一個很大的數值</li>
+</ul>
+<pre class="cpp"><code>...
+INTERNAL_SIZE_T  max_fast;
+mfastbinptr      fastbins[NFASTBINS];
+mchunkptr        top;
+...
+
+#define fastbin_index(sz)    ((((unsigned int)(sz)) &gt;&gt; 3) - 2)</code></pre>
+</section><section id="step2-改寫-arena_key" class="slide level2">
+<h1>Step2: 改寫 arena_key</h1>
+<ul>
+<li>由於 <code>max_fast</code> 被改大了，之後所有操作都會進到 fastbin</li>
+<li>free 一個特定大小的 chunk，把 <code>p</code> 寫到 <code>arena_key</code> 上</li>
+<li>下面的例子中，正確的 size 為 <code>(0x484/4 + 2) * 8 = 2383</code></li>
+</ul>
+<pre class="no-highlight"><code>0xb7f00000 &lt;main_arena&gt;:        0x00000000
+0xb7f00004 &lt;main_arena+4&gt;:      0x00000049   &lt;-- max_fast
+0xb7f00008 &lt;main_arena+8&gt;:      0x00000000   &lt;-- fastbin[0]
+0xb7f0000c &lt;main_arena+12&gt;:     0x00000000   &lt;-- fastbin[1]
+....
+0xb7f00488 &lt;mp_+40&gt;:            0x0804a000   &lt;-- mp_.sbrk_base
+0xb7f0048c &lt;arena_key&gt;:         0xb7f00000</code></pre>
+</section><section id="step3-1-使-malloc-回傳任意位址" class="slide level2">
+<h1>Step3-1: 使 malloc 回傳任意位址</h1>
+<ul>
+<li>Step2 中被 free 的 chunk，會成為新的 heap arena，即 chunk 中的內容會被當做 heap 來操作</li>
+<li>預先在 chunk 的 fastbin 欄位放好某個想要得到的位址，利如: stack, GOT</li>
+<li>malloc (fastbin) 會把這個位址回傳，之後可以直接對這個位址讀寫</li>
+<li>malloc size 需要夠小，才有辦法預先放上 fastbin entry</li>
+</ul>
+</section><section id="step3-2-使用-malloc-寫入任意位址" class="slide level2">
+<h1>Step3-2: 使用 malloc 寫入任意位址</h1>
+<ul>
+<li>當 malloc size &gt; 512 時，可以利用 unsorted_chunks</li>
+<li>構造 <code>av-&gt;bins[1]</code> 指向 <code>A</code>，可以把 <code>*(A-&gt;bk-&gt;bk+8)</code> <br>寫為 <code>A</code></li>
+<li>也可以回傳 <code>A-&gt;bk</code>，之後再寫入</li>
+</ul>
+<pre class="cpp"><code>for(;;) {
+  while ( (victim = unsorted_chunks(av)-&gt;bk) !=
+    unsorted_chunks(av)) {
+      bck = victim-&gt;bk;
+      ...
+      size = chunksize(victim);
+      ...
+      unsorted_chunks(av)-&gt;bk = bck;
+      bck-&gt;fd = unsorted_chunks(av);
+      if (size == nb) {
+        ...
+        return chunk2mem(victim);
+      }</code></pre>
+</section><section id="the-house-of-mind" class="slide level2">
+<h1>The House of Mind</h1>
+<ul>
+<li>有可能只需要一次 free</li>
+<li>條件: <code>ar_ptr</code> 必需要是下一個 arena</li>
+</ul>
+<pre><code>public_fREe(Void_t* mem)
+{
+    mstate ar_ptr;
+    mchunkptr p;        /* chunk corresponding to mem */
+    ...
+    p = mem2chunk(mem);
+    ...
+    ar_ptr = arena_for_chunk(p);
+    ...
+    _int_free(ar_ptr, mem);</code></pre>
+</section><section id="arena" class="slide level2">
+<h1>Arena</h1>
+<ul>
+<li>Heap 的大小有限制 (1M)，如果超過了會建立一個新的</li>
+<li>假設原 heap1 在 arena1，malloc 夠多的記憶體後，會在 arena2 開一個新的 heap2</li>
+<li>arena1 和 arena2 在記憶體上的位置是連續的</li>
+</ul>
+</section><section id="overflow" class="slide level2">
+<h1>Overflow</h1>
+<ul>
+<li>在 arena1 中的 chunk 有 overflow</li>
+<li>這個 overflow 有辦法超過 arena1 的邊界，寫到 arena2</li>
+<li>結果是<strong>寫掉 heap2 的 meta-data</strong></li>
+</ul>
+<figure>
+<img src="imgs/house_of_mind.png" />
+</figure>
+</section><section id="exploit-method-1" class="slide level2">
+<h1>Exploit Method 1</h1>
+<ul>
+<li>最終要利用的 <a href="http://code.woboq.org/userspace/glibc/malloc/malloc.c.html#3599">code</a> 片段類似 unlink()，但沒有 harden</li>
+<li>跟 House of Prime 類似，整個 heap 結構在控制之下</li>
+<li><code>free(p)</code> 後能到達底下這段 code (<code>p</code> 是 arena2 裡的 chunk)</li>
+<li>一樣需控制 <code>bins[1]</code>，即 unsorted_chunks</li>
+</ul>
+<pre class="cpp"><code>bck = unsorted_chunks(av);
+fwd = bck-&gt;fd;
+p-&gt;bk = bck;
+p-&gt;fd = fwd;
+bck-&gt;fd = p;
+fwd-&gt;bk = p;</code></pre>
+</section><section id="大量需繞過的條件" class="slide level2">
+<h1>大量需繞過的條件</h1>
+<ul>
+<li>The negative of the size of the overflowed chunk must be less than the value of the chunk itself.</li>
+<li>The size of the chunk must not be less than max_fast.</li>
+<li>The IS_MMAPPED bit of the size cannot be set.</li>
+<li>The overflowed chunk cannot equal av-&gt;top.</li>
+<li>The NONCONTIGUOUS_BIT of max_fast must be set.</li>
+<li>The PREV_INUSE bit of the nextchunk must be set.</li>
+<li>The size of nextchunk must be greater than 8.</li>
+<li>The size of nextchunk must be less than system_mem</li>
+<li>The PREV_INUSE bit of the chunk must not be set.</li>
+<li>The nextchunk cannot equal av-&gt;top.</li>
+<li>The PREV_INUSE bit of the chunk after nextchunk must be set</li>
+</ul>
+</section><section id="exploit-method-2" class="slide level2">
+<h1>Exploit Method 2</h1>
+<ul>
+<li>使用 fastbin，<code>*fb = p</code> 做寫入</li>
+<li>例如 <code>*(GOT_entry) = shellcode</code></li>
+<li>要注意的條件只有 <code>p-&gt;size</code></li>
+</ul>
+<pre class="cpp"><code>if ((unsigned long)(size) &lt;= (unsigned long)(av-&gt;max_fast)) {
+  if (chunk_at_offset (p, size)-&gt;size &lt;= 2 * SIZE_SZ
+     || __builtin_expect (chunksize (chunk_at_offset (p, size))
+                             &gt;= av-&gt;system_mem, 0)) {
+      errstr = &quot;free(): invalid next size (fast)&quot;;
+      goto errout;
+    }
+
+  set_fastchunks(av);
+  fb = &amp;(av-&gt;fastbins[fastbin_index(size)]);
+  ...
+  p-&gt;fd = *fb;
+  *fb = p;
+}</code></pre>
+</section><section id="house-of-force" class="slide level2">
+<h1>House of Force</h1>
+<ul>
+<li>使用兩次 malloc，第二次 malloc 回傳任意位址</li>
+<li>第一次 malloc 的大小需可控制</li>
+<li>第二次 malloc 要足夠大</li>
+</ul>
+</section><section id="idea-2" class="slide level2">
+<h1>Idea</h1>
+<ul>
+<li>利用 malloc 裡的 use_top 片段</li>
+<li>要能 overflow 到 top_chunk</li>
+</ul>
+<pre class="cpp"><code>use_top:
+  victim = av-&gt;top;
+  size = chunksize(victim);
+  if ((unsigned long)(size) &gt;= (unsigned long)(nb + MINSIZE)) {
+    remainder_size = size - nb;
+    remainder = chunk_at_offset(victim, nb);
+    av-&gt;top = remainder;
+    set_head(victim, nb | PREV_INUSE |
+             (av != &amp;main_arena ? NON_MAIN_ARENA : 0));
+    set_head(remainder, remainder_size | PREV_INUSE);
+    check_malloced_chunk(av, victim, nb);
+    return chunk2mem(victim);
+  }</code></pre>
+</section><section id="step-0" class="slide level2">
+<h1>Step 0</h1>
+<ul>
+<li>先 overflow 掉 top_chunk 的 size，改成一個夠大的值</li>
+<li>確保任何大小的 malloc 都可以使用 top_chunk</li>
+</ul>
+</section><section id="step-1" class="slide level2">
+<h1>Step 1</h1>
+<ul>
+<li>malloc(nb)，如果 nb 大小可以控制，最後可以控制 <code>av-&gt;top</code> 所指的位置</li>
+<li><code>av-&gt;top</code> 是 top_chunk 所在位置</li>
+</ul>
+<pre class="cpp"><code>    remainder_size = size - nb;
+    remainder = chunk_at_offset(victim, nb);
+    av-&gt;top = remainder;</code></pre>
+</section><section id="step-2" class="slide level2">
+<h1>Step 2</h1>
+<ul>
+<li>第二次 malloc，會回傳 Step 1 控制的 <code>av-&gt;top</code></li>
+<li>取得任意位址的 pointer，可以再進行寫入</li>
+</ul>
+<pre class="cpp"><code>  victim = av-&gt;top;
+    ...
+    return chunk2mem(victim);</code></pre>
+</section><section id="the-house-of-lord" class="slide level2">
+<h1>The House of Lord</h1>
+<ul>
+<li>同 House of Force，只需要多次的 malloc</li>
+<li>使用 <a href="http://code.woboq.org/userspace/glibc/malloc/malloc.c.html#3366">smallbin</a></li>
+<li>或 chunk searching 裡的 <a href="http://code.woboq.org/userspace/glibc/malloc/malloc.c.html#3669">largebin</a></li>
+</ul>
+</section><section id="idea-corrupting-a-bin" class="slide level2">
+<h1>Idea: Corrupting a Bin</h1>
+<ul>
+<li>Overflow 修改一個在 smallbin 裡的 chunk (freed)</li>
+<li>改掉這個 chunk 的 bk，變成想要取得的 target 位址</li>
+</ul>
+<pre class="cpp"><code>    if (in_smallbin_range(nb)) {
+      idx = smallbin_index(nb);
+      bin = bin_at(av,idx);
+      if ( (victim = last(bin)) != bin) {
+        if (victim == 0) /* initialization check */
+          malloc_consolidate(av);
+        else {
+          bck = victim-&gt;bk;
+          set_inuse_bit_at_offset(victim, nb);
+          bin-&gt;bk = bck;
+          bck-&gt;fd = bin;
+          ...
+          return chunk2mem(victim);
+        }
+      }
+    }</code></pre>
+</section><section id="idea-corrupting-a-bin-1" class="slide level2">
+<h1>Idea: Corrupting a Bin</h1>
+<ul>
+<li>每次 malloc 會依序把 bin 中的 chunk 取出來 (victim)</li>
+<li>取出被改寫的 chunk 後，<code>bin-&gt;bk = bck = victim-&gt;bk = target</code></li>
+<li>再一次 malloc 就會取出 <code>victim = target</code></li>
+</ul>
+<pre class="cpp"><code>    if (in_smallbin_range(nb)) {
+      idx = smallbin_index(nb);
+      bin = bin_at(av,idx);
+      if ( (victim = last(bin)) != bin) {
+        if (victim == 0) /* initialization check */
+          malloc_consolidate(av);
+        else {
+          bck = victim-&gt;bk;
+          set_inuse_bit_at_offset(victim, nb);
+          bin-&gt;bk = bck;
+          bck-&gt;fd = bin;
+          ...
+          return chunk2mem(victim);
+        }
+      }
+    }</code></pre>
+</section><section id="the-house-of-spirit" class="slide level2">
+<h1>The House of Spirit</h1>
+<ul>
+<li>不需要 heap 上的 overflow</li>
+<li>需要 stack overflow，可以修改一個被傳入 free 的 pointer: <code>p</code></li>
+<li>在 <code>p</code> 構造假的 chunk，free 會把這個 chunk 放進 bin</li>
+<li>再次 malloc 就會取得 pointer</li>
+</ul>
+</section><section id="using-fastbin" class="slide level2">
+<h1>Using fastbin</h1>
+<ul>
+<li>假 chunk size 不能太大，因為要使用 fastbin</li>
+<li>構造假的 fastbin chunk，只需要處理 prevsize 和 size 的檢查</li>
+</ul>
+<pre class="cpp"><code>if ((unsigned long)(size) &lt;= (unsigned long)(av-&gt;max_fast)) {
+  if (chunk_at_offset (p, size)-&gt;size &lt;= 2 * SIZE_SZ
+    || __builtin_expect (chunksize (chunk_at_offset (p, size))
+                                      &gt;= av-&gt;system_mem, 0)) {
+      errstr = &quot;free(): invalid next size (fast)&quot;;
+      goto errout;
+    }
+  ...
+  fb = &amp;(av-&gt;fastbins[fastbin_index(size)]);
+  ...
+  p-&gt;fd = *fb;
+  *fb = p;
+}</code></pre>
+</section><section id="用途" class="slide level2">
+<h1>用途</h1>
+<ul>
+<li>Stack overflow 距離不夠，用 malloc 取得 pointer 後可以二次 overflow</li>
+<li>取得 pointer 可以 leaking information (例如 Stackguard canary)</li>
+<li>直接 overflow 會破壞 local variable 使 overflow 失敗，但足以構造 chunk 製造第二次 overflow 機會</li>
+</ul>
+</section></section>
+    </div>
+  </div>
+
+  <script src="reveal.js/lib/js/head.min.js"></script>
+  <script src="reveal.js/js/reveal.min.js"></script>
+
+  <script>
+
+      // Full list of configuration options available here:
+      // https://github.com/hakimel/reveal.js#configuration
+      Reveal.initialize({
+        controls: true,
+        progress: true,
+        history: true,
+        center: true,
+        theme: 'my', // available themes are in /css/theme
+        transition: 'linear', // default/cube/page/concave/zoom/linear/fade/none
+
+        // Optional libraries used to extend on reveal.js
+        dependencies: [
+          { src: 'reveal.js/lib/js/classList.js', condition: function() { return !document.body.classList; } },
+          { src: 'reveal.js/plugin/highlight/highlight.js', async: true, callback: function() { hljs.initHighlightingOnLoad(); } },
+          { src: 'reveal.js/plugin/zoom-js/zoom.js', async: true, condition: function() { return !!document.body.classList; } },
+          { src: 'reveal.js/plugin/notes/notes.js', async: true, condition: function() { return !!document.body.classList; } },
+//          { src: 'reveal.js/plugin/search/search.js', async: true, condition: function() { return !!document.body.classList; }, }
+//          { src: 'reveal.js/plugin/remotes/remotes.js', async: true, condition: function() { return !!document.body.classList; } }
+]});
+    </script>
+  </body>
+</html>

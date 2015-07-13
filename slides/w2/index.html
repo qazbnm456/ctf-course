@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="generator" content="pandoc">
+  <title>x86 Linux Programming</title>
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <link rel="stylesheet" href="reveal.js/lib/css/zenburn.css">
+  <link rel="stylesheet" href="reveal.js/css/reveal.min.css"/>
+    <style type="text/css">code{white-space: pre;}</style>
+    <link rel="stylesheet" href="reveal.js/css/theme/simple.css" id="theme">
+  <link rel="stylesheet" media="print" href="reveal.js/css/print/pdf.css" />
+  <!--[if lt IE 9]>
+  <script src="reveal.js/lib/js/html5shiv.js"></script>
+  <![endif]-->
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+
+<section>
+    <h1 class="title">x86 Linux Programming</h1>
+    <h3 class="date"></h3>
+</section>
+
+<section id="overview" class="slide level2">
+<h1>Overview</h1>
+<ul>
+<li>32-bit x86 assembly language</li>
+<li>system call</li>
+<li>stack &amp; calling convention</li>
+<li>ELF &amp; dynamically linking</li>
+<li>Shellcode tricks</li>
+</ul>
+</section>
+<section><section id="tutorial-x86-asm" class="titleslide slide level1"><h1>Tutorial: x86 ASM</h1></section><section id="done" class="slide level2">
+<h1>Done!</h1>
+<p>Intel® 64 and IA-32 Architectures<br>Software Developer's Manual<br> (共 3439 頁)</p>
+</section><section id="x86-is-complex" class="slide level2">
+<h1>x86 is Complex!</h1>
+<ul>
+<li><a href="http://sparksandflames.com/files/x86InstructionChart.html">元素表 (opcode)</a></li>
+<li><a href="https://code.google.com/p/corkami/wiki/x86oddities">無用小知識</a></li>
+</ul>
+</section><section id="無用小知識" class="slide level2">
+<h1>無用小知識</h1>
+<ul>
+<li><code>lock add qword cs:[eax + 4 * eax + 07e06df23h], 0efcdab89h</code></li>
+<li><code>aeskeygenassist</code></li>
+</ul>
+</section><section id="準備工具" class="slide level2">
+<h1>準備工具</h1>
+<ul>
+<li>nasm</li>
+<li>objdump</li>
+<li>gcc</li>
+<li>gdb</li>
+<li>Editor</li>
+<li>x86 Linux machine (CSIE Workstation is fine)</li>
+</ul>
+<pre class="no-highlight"><code>$ lscpu
+Architecture:          x86_64
+CPU op-mode(s):        32-bit, 64-bit
+Byte Order:            Little Endian
+... </code></pre>
+</section><section id="bit-x86-assembly-language" class="slide level2">
+<h1>32-bit x86 Assembly Language</h1>
+<ul>
+<li>Intel syntax</li>
+<li>Use nasm for assembling</li>
+<li><code>gcc -m32</code> 可以編出 32-bit binary，預設會是 64-bit (apt-get install gcc-multilib)</li>
+</ul>
+</section><section id="nasm" class="slide level2">
+<h1>NASM</h1>
+<ul>
+<li><code>apt-get install nasm</code></li>
+<li><code>nasm -felf32 a.asm -o a.o &amp;&amp; ld a.o -melf_i386 -o a</code></li>
+<li>有一些好用的語法 extension</li>
+</ul>
+</section><section id="example-assemble-disassemble" class="slide level2">
+<h1>Example: Assemble &amp; Disassemble</h1>
+<p><code>nasm -felf32 a.asm -o a.o &amp;&amp; ld a.o -melf_i386 -o a</code></p>
+<pre class="avrasm"><code>section .text
+global _start
+_start:
+    mov eax, 0x1337
+    add ebx, eax
+    jmp _start</code></pre>
+<p><code>objdump -M intel -d ./a</code></p>
+<pre class="no-highlight"><code>00000000 &lt;_start&gt;:
+   0:   b8 37 13 00 00          mov    eax,0x1337
+   5:   01 c3                   add    ebx,eax
+   7:   eb f7                   jmp    0 &lt;_start&gt;</code></pre>
+</section><section id="where-to-place-data" class="slide level2">
+<h1>Where to place data?</h1>
+<ul>
+<li><strong>imm</strong>: Immediate Value 常數</li>
+<li><strong>reg</strong>: Register 暫存器</li>
+<li><strong>mem</strong>: Memory 記憶體</li>
+</ul>
+</section><section id="immediate-value" class="slide level2">
+<h1>Immediate Value</h1>
+<ul>
+<li>Code 裡會看到的各種<strong>常數</strong>，例如 <code>mov eax, 0x1337</code></li>
+<li>或者 code 裡看不到，但實際上 machine code 中會有一些固定值，例如 <code>JE Label1</code> 實際上會是一個固定的 jump offset</li>
+</ul>
+</section><section id="register" class="slide level2">
+<h1>Register</h1>
+<ul>
+<li><code>eax</code> <code>ebx</code> <code>ecx</code> <code>edx</code> - <strong>DWORD</strong> (32-bit)</li>
+<li><code>ax</code> <code>bx</code> <code>cx</code> <code>dx</code> - <strong>WORD</strong> (16-bit)</li>
+<li><code>ah</code> <code>bh</code> <code>ch</code> <code>dh</code> - <strong>BYTE</strong> (8-bit)</li>
+<li><code>al</code> <code>bl</code> <code>cl</code> <code>dl</code> - BYTE (8-bit)</li>
+<li>一般用途運算</li>
+</ul>
+<p><img style="border:none" src="images/reg.png"></p>
+</section><section id="register-1" class="slide level2">
+<h1>Register</h1>
+<ul>
+<li><code>esp</code> <code>ebp</code> <code>esi</code> <code>edi</code> - DWORD (32-bit)</li>
+<li><code>sp</code> <code>bp</code> <code>si</code> <code>di</code> - WORD (16-bit) 很少用到</li>
+<li>[esp, ebp] 一般用來標記 stack frame 的範圍</li>
+<li>esi, edi 常當做 buffer pointer 使用，而且某些字串指令會直接對 esi, edi 操作</li>
+</ul>
+</section><section id="other-register" class="slide level2">
+<h1>Other Register</h1>
+<ul>
+<li><code>eip</code> - Program counter，即 code 執行到哪 (address)</li>
+<li><code>eflags</code> - 無法直接修改，但指令的執行結果會存放在此</li>
+<li><code>cs</code> <code>ss</code> <code>ds</code> <code>es</code> <code>fs</code> <code>gs</code> - segment register</li>
+</ul>
+</section><section id="eflags" class="slide level2">
+<h1>EFLAGS</h1>
+<ul>
+<li>Carry</li>
+<li>Parity</li>
+<li>Auxiliary</li>
+<li>Zero</li>
+<li>Sign</li>
+<li>Trap</li>
+<li>Interrupt</li>
+<li>Direction</li>
+<li>Overflow</li>
+</ul>
+</section><section id="operation" class="slide level2">
+<h1>Operation</h1>
+<ul>
+<li>常見 reg2reg, imm2reg, reg2mem, mem2reg</li>
+<li>不過 x86 指令集很複雜，基本上什麼都有</li>
+<li>mov, add, sub, shl, shr, and, or, xor</li>
+<li>push, pop</li>
+</ul>
+</section><section id="mov" class="slide level2">
+<h1>MOV</h1>
+<ul>
+<li>Move imm/reg/mem value to reg/mem</li>
+<li><code>mov A, B</code> is &quot;Move B to A&quot; (A=B)</li>
+<li>Data size 要相等</li>
+</ul>
+<pre class="avrasm"><code>mov eax, 0x1337
+mov bx, ax
+mov [esp+4], bl</code></pre>
+</section><section id="movzx-movsx" class="slide level2">
+<h1>MOVZX / MOVSX</h1>
+<ul>
+<li>從小的暫存器搬移資料到大的暫存器</li>
+<li>Zero-extend / sign-extend</li>
+<li>Example: <code>movzx ebx, al</code></li>
+</ul>
+</section><section id="more-about-memory-access" class="slide level2">
+<h1>More About Memory Access</h1>
+<ul>
+<li><code>mov ebx, [esp + eax * 4]</code> Intel</li>
+<li><code>mov (%esp, %eax, 4), %ebx</code> AT &amp; T</li>
+<li><code>mov BYTE [eax], 0x0f</code><br>必須指定 data size: <code>BYTE/WORD/DWORD</code></li>
+</ul>
+</section><section id="value" class="slide level2">
+<h1>Value?</h1>
+<p><code>eax = 000000ff, esp: f0 00 00 00</code></p>
+<ul>
+<li class="fragment"><code>mov eax, -1</code></li>
+<li class="fragment"><code>mov al, -1</code></li>
+<li class="fragment"><code>mov [esp], al</code></li>
+<li class="fragment"><code>mov [esp], BYTE 3</code></li>
+<li class="fragment"><code>movsx eax, BYTE [esp]</code></li>
+<li class="fragment"><code>movsx eax, WORD [esp]</code></li>
+<li class="fragment"><code>movsx DWORD [esp], al</code></li>
+</ul>
+</section><section id="add-sub" class="slide level2">
+<h1>ADD / SUB</h1>
+<ul>
+<li>一般情況是 &quot;reg += reg&quot; 或 &quot;reg += imm&quot;</li>
+<li>Data size 要相等</li>
+</ul>
+<pre class="avrasm"><code>add eax, ebx
+sub eax, 123
+sub eax, BL  ; Illegal</code></pre>
+</section><section id="shl-shr-sar" class="slide level2">
+<h1>SHL / SHR / SAR</h1>
+<ul>
+<li>Shift logical left / right</li>
+<li>Shift arithmetic right</li>
+<li>計算 memory address 時常見 <code>SHL eax, 2</code></li>
+</ul>
+</section><section id="shift-by-variable" class="slide level2">
+<h1>Shift by variable</h1>
+<ul>
+<li><code>shl eax, ebx</code> ?</li>
+</ul>
+</section><section id="lea" class="slide level2">
+<h1>lea</h1>
+<ul>
+<li><code>lea eax, [esp + 4]</code></li>
+<li><code>lea eax, [eax + ebx*4 + 3]</code></li>
+</ul>
+</section><section id="stack-push-pop" class="slide level2">
+<h1>Stack &amp; PUSH / POP</h1>
+<ul>
+<li>Stack 是由 high address 開始，往 low address 長</li>
+<li><code>push eax</code> = <code>sub esp, 4</code> + <code>mov [esp], eax</code></li>
+<li><code>pop eax</code> = <code>mov eax, [esp]</code> + <code>add esp, 4</code></li>
+<li><code>push 0x1</code></li>
+</ul>
+</section><section id="jump" class="slide level2">
+<h1>Jump</h1>
+<ul>
+<li>Unconditional jump: <code>jmp</code></li>
+<li>Conditional jump: <code>je/jne</code><br>另外還有 <code>ja/jae/jb/jbe/jg/jge/jl/jle</code> ...</li>
+<li>搭配 <code>cmp A, B</code> 使用，比較兩者的值並設定 eflags</li>
+<li>Conditional jump 根據 eflags 的某些欄位決定要不要 jump，否則繼續跑下一條</li>
+</ul>
+</section><section id="example-jl-for-loop" class="slide level2">
+<h1>Example: jl for loop</h1>
+<pre class="avrasm"><code>    mov ecx, 0
+L1:
+
+    ; Loop x 10 
+
+    inc ecx
+    cmp ecx, 10
+    jl  L1
+
+    ; followed instructions</code></pre>
+</section><section id="compare-jbejle" class="slide level2">
+<h1>Compare jbe/jle</h1>
+<ul>
+<li>Below vs less ?</li>
+<li><code>ja/jae/jb/jbe</code> are unsigned comparison</li>
+<li><code>jg/jge/jl/jle</code> are signed comparison</li>
+</ul>
+</section><section id="jmp-offset" class="slide level2">
+<h1>jmp offset</h1>
+<ul>
+<li>short 1-byte offset <code>eb fe</code></li>
+<li>long 4-byte offset <code>e9 13 fc ff ff</code></li>
+</ul>
+<pre class="no-highlight"><code>08048060 &lt;_start&gt;:
+ 8048060:       eb fe                   jmp    8048060 &lt;_start&gt;
+ 8048062:       eb 03                   jmp    8048067 &lt;A&gt;
+ 8048064:       90                      nop
+ 8048065:       90                      nop
+ 8048066:       90                      nop
+
+08048067 &lt;A&gt;:
+ 8048067:       90                      nop</code></pre>
+</section><section id="rep" class="slide level2">
+<h1>rep</h1>
+<ul>
+<li><code>rep/repe/repne</code></li>
+<li><code>ins/movs/outs/lods/sots/scas/cmps</code></li>
+<li><code>b/w/d</code></li>
+<li>Usage: <code>rep stosb</code> (fill up buffer by <code>al</code>)</li>
+<li><a href="http://faydoc.tripod.com/cpu/repne.htm">Reference</a></li>
+</ul>
+</section><section id="example-strlen" class="slide level2">
+<h1>Example: strlen</h1>
+<ul>
+<li>Try <code>strlen()</code> and compile with <code>gcc -O1</code></li>
+</ul>
+<pre class="avrasm"><code>mov ecx, -1
+mov edi, msg
+mov eax, 0    
+repnz scasb   ; 找到字串結尾的 &#39;\0&#39; 
+not ecx       ; ecx = -ecx - 1 = -1 - ecx = index of &#39;\0&#39; (1-based)
+dec ecx       ; ecx = ecx - 1</code></pre>
+</section></section>
+<section><section id="system-call" class="titleslide slide level1"><h1>System Call</h1></section><section id="system-call-1" class="slide level2">
+<h1>System Call</h1>
+<ul>
+<li>Use <code>int 0x80</code> to call Linux system call</li>
+<li><code>eax</code> 指定 system call number</li>
+<li>參數放在 <code>ebx</code>, <code>ecx</code>, <code>edx</code>, <code>esi</code>, <code>edi</code></li>
+<li>回傳值放在 <code>eax</code></li>
+<li><a href="http://syscalls.kernelgrok.com/">Table</a></li>
+</ul>
+</section><section id="trace-by-strace" class="slide level2">
+<h1>Trace by strace</h1>
+<p><code>strace /bin/echo AAAAA</code></p>
+<pre class="cpp"><code>/* ... lots of syscall for loading binary ... */
+write(1, &quot;AAAAA\n&quot;, 6AAAAA
+)                  = 6
+close(1)                                = 0
+munmap(0x7f8a54d91000, 4096)            = 0
+close(2)                                = 0
+exit_group(0)                           = ?
++++ exited with 0 +++</code></pre>
+</section><section id="example-hello-world" class="slide level2">
+<h1>Example: Hello world</h1>
+<pre class="avrasm"><code>section .text
+global _start
+_start:
+    mov eax, 4    ; sys_write
+    mov ebx, 1    ; fd
+    mov ecx, msg  ; buf
+    mov edx, 13   ; size
+    int 0x80      ; write(1, &quot;Hello world!\n&quot;, 13);
+
+    mov eax, 1    ; sys_exit
+    mov ebx, 0    ; status
+    int 0x80      ; exit(0);
+section .data
+msg:
+    db &#39;Hello world!&#39;, 0xA</code></pre>
+</section><section id="some-useful-system-call" class="slide level2">
+<h1>Some Useful System Call</h1>
+<ul>
+<li><code>open/read/write</code></li>
+<li><code>mmap/mprotect</code></li>
+<li><code>execve</code></li>
+</ul>
+</section><section id="openreadwrite" class="slide level2">
+<h1>Open/read/write</h1>
+<center>
+ 
+<table>
+<thead>
+<tr class="header">
+<th style="text-align: right;">eax</th>
+<th style="text-align: right;">ebx</th>
+<th style="text-align: right;">ecx</th>
+<th style="text-align: right;">edx</th>
+<th style="text-align: left;"></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: right;">0x05</td>
+<td style="text-align: right;">path</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;"><code>open(path, O_RDONLY)</code></td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">0x03</td>
+<td style="text-align: right;">fd</td>
+<td style="text-align: right;">buf</td>
+<td style="text-align: right;">size</td>
+<td style="text-align: left;"><code>read(fd, buf, size)</code></td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">0x04</td>
+<td style="text-align: right;">fd</td>
+<td style="text-align: right;">buf</td>
+<td style="text-align: right;">size</td>
+<td style="text-align: left;"><code>write(fd, buf, size)</code></td>
+</tr>
+</tbody>
+</table>
+</center>
+
+</section><section id="mmapmprotect" class="slide level2">
+<h1>mmap/mprotect</h1>
+<ul>
+<li>mmap: use to allocate an executable area</li>
+<li>mprotect: disable data executable prevention</li>
+</ul>
+</section><section id="execve" class="slide level2">
+<h1>execve</h1>
+<ul>
+<li><code>execve(char* path, char* argv[], char* envp[]);</code></li>
+<li>path: 要執行的檔案路徑</li>
+<li>argv: 參數的 char* pointer array</li>
+<li>envp: environment variable 的 char* pointer array</li>
+</ul>
+</section><section id="example-launch-a-shell" class="slide level2">
+<h1>Example: launch a shell</h1>
+<pre class="avrasm"><code>section .text
+global _start
+_start:
+    mov eax, 0x0b
+    mov ebx, sh
+    mov ecx, argv
+    mov edx, envp
+    int 0x80
+
+section .data
+argv:
+    dd sh, 0
+envp:
+    dd 0
+sh:
+    db &quot;/bin/sh&quot;, 0</code></pre>
+</section></section>
+<section><section id="caller-callee" class="titleslide slide level1"><h1>Caller &amp; Callee</h1></section><section id="how-to-call-a-function" class="slide level2">
+<h1>How to call a function?</h1>
+<ul>
+<li><code>call</code> call a function by ...
+<ul>
+<li>Push <strong>return address</strong> on stack. Then jump to function.</li>
+</ul></li>
+<li><code>ret</code>
+<ul>
+<li>Pop return address on stack. Then jump by this value.</li>
+</ul></li>
+</ul>
+</section><section id="example-dummy-function" class="slide level2">
+<h1>Example: dummy function</h1>
+<pre class="avrasm"><code>_start:
+    ; start from here
+    call foo
+    ; return to here
+
+foo:
+    ; ... do someing here ...
+    ret</code></pre>
+</section><section id="calling-convention-呼叫慣例" class="slide level2">
+<h1>Calling Convention (呼叫慣例)</h1>
+<ul>
+<li>x86 沒有規定參數要怎麼傳!
+<ul>
+<li>By register</li>
+<li>By stack</li>
+</ul></li>
+</ul>
+</section><section id="pass-arguments-return-result" class="slide level2">
+<h1>Pass Arguments / Return Result</h1>
+<ul>
+<li>參數依序放 stack
+<ul>
+<li><code>mov [esp+X], Y</code></li>
+<li>如果要用 <code>push</code> 則從最後一個參數開始</li>
+</ul></li>
+<li>回傳值放 <code>eax</code></li>
+</ul>
+</section><section id="example-foo1-2-3-3" class="slide level2">
+<h1>Example : foo(1, 2, 3) =&gt; 3</h1>
+<pre><code>_start:
+    mov DWORD [esp], 1    ; arg1 = 1
+    mov DWORD [esp+4], 2  ; arg2 = 2
+    mov DWORD [esp+8], 3  ; arg3 = 3
+    call foo
+
+foo:
+    mov ebx, [esp+4]      ; ebx = arg1 (there is a return value on stack!)
+    mov eax, [esp+8]      ; eax = arg2
+    add eax, ebx          ; result = arg1 + arg2
+    ret
+</code></pre>
+</section><section id="more-about-stack" class="slide level2">
+<h1>More About Stack</h1>
+<ul>
+<li>Pass arguments</li>
+<li>Save the return address</li>
+<li>Save <strong>local variable</strong></li>
+</ul>
+</section><section id="local-variable-區域變數" class="slide level2">
+<h1>Local Variable (區域變數)</h1>
+<ul>
+<li>Register 數量有限</li>
+<li>區域變數 (函式返回後就消失) 放在 stack frame 上</li>
+<li>用 <code>esp</code> 和 <code>ebp</code> 指出當前函式的 stack 範圍</li>
+<li>用 <code>esp</code> 或 <code>ebp</code> 相對位置存取: <code>mov eax, [esp+124]</code></li>
+<li>很容易遞迴呼叫 (recursive call)</li>
+</ul>
+</section><section id="example-1-2-10" class="slide level2">
+<h1>Example: 1 + 2 + … + 10</h1>
+<pre class="avrasm"><code>_start:
+    push 10
+    call sum_1_to_N
+    nop
+
+sum_1_to_N:
+    push ebp
+    mov  ebp, esp
+    sub  esp, 4         ; prepare stack frame
+    mov  eax, [ebp+8]
+    test eax, eax       ; test if arg1 = 0
+    jz   end            ; if arg1 = 0, then just end and return 0
+    dec  eax
+    mov  [esp], eax     
+    call sum_1_to_N     ; eax = sum_1_to_N(arg1-1)
+    mov  ebx, [ebp+8]   
+    add  eax, ebx       ; result = eax + arg1
+end:
+    leave               ; ?
+    ret</code></pre>
+</section><section id="maintain-stack-frame" class="slide level2">
+<h1>Maintain Stack Frame</h1>
+<ul>
+<li><code>sub esp, 4</code> ... <code>add esp, 4</code></li>
+<li>用 <code>ebp</code> 保存前一個 frame 的 <code>esp</code>，<code>ebp</code> 本身則存到 stack 上，取回 <code>esp</code> 常見的有兩種方法
+<ul>
+<li><code>mov esp, ebp</code> + <code>pop ebp</code></li>
+<li><code>leave</code> (跟上個方法等價)</li>
+</ul></li>
+</ul>
+<pre class="avrasm"><code>    push ebp
+    mov  ebp, esp
+    sub  esp, 4
+    ...
+
+; (1)
+    mov esp, ebp
+    pop ebp
+    ret
+; (2)
+    leave
+    ret</code></pre>
+</section></section>
+<section><section id="elf-executable" class="titleslide slide level1"><h1>ELF executable</h1></section><section id="file" class="slide level2">
+<h1>file</h1>
+<pre class="no-highlight"><code>$ gcc a.c -o a -m32 &amp;&amp; file ./a
+a: ELF 32-bit LSB  executable, Intel 80386, version 1 (SYSV), 
+dynamically linked (uses shared libs), for GNU/Linux 2.6.24, 
+BuildID[sha1]=312e8c1a9fab1d36b43b95c3c09b1cd8fe44b8ce, not stripped</code></pre>
+<ul>
+<li>ELF 32-bit LSB</li>
+<li>Dynamically linked</li>
+</ul>
+</section><section id="shared-library" class="slide level2">
+<h1>Shared Library</h1>
+<pre class="no-highlight"><code>$ ldd ./a
+    linux-gate.so.1 =&gt;  (0xf77a4000)
+    libc.so.6 =&gt; /lib32/libc.so.6 (0xf75e8000)
+    /lib/ld-linux.so.2 (0xf77a5000)</code></pre>
+<ul>
+<li>ELF 由 ld-linux.so.2 載入，負責 memory mapping，載入 shared library 等</li>
+<li>可以呼叫 libc.so.6 裡的 function</li>
+</ul>
+</section><section id="memory-layout-of-elf-file" class="slide level2">
+<h1>Memory Layout of ELF File</h1>
+<ul>
+<li>Memory 以 page 為單位 (4096 bytes)，而且對齊</li>
+</ul>
+<pre class="no-highlight"><code>$ cat /proc/`pidof a`/maps
+08048000-08049000 r-xp 00000000 fc:00 8678379    /home/course/temp/a
+08049000-0804a000 r--p 00000000 fc:00 8678379    /home/course/temp/a
+0804a000-0804b000 rw-p 00001000 fc:00 8678379    /home/course/temp/a
+f7531000-f7532000 rw-p 00000000 00:00 0
+f7532000-f76d8000 r-xp 00000000 fc:00 5374006    /lib32/libc-2.19.so
+f76d8000-f76da000 r--p 001a5000 fc:00 5374006    /lib32/libc-2.19.so
+f76da000-f76db000 rw-p 001a7000 fc:00 5374006    /lib32/libc-2.19.so
+f76db000-f76df000 rw-p 00000000 00:00 0
+f76ed000-f76ee000 rw-p 00000000 00:00 0
+f76ee000-f76ef000 r-xp 00000000 00:00 0          [vdso]
+f76ef000-f770f000 r-xp 00000000 fc:00 5374007    /lib32/ld-2.19.so
+f770f000-f7710000 r--p 0001f000 fc:00 5374007    /lib32/ld-2.19.so
+f7710000-f7711000 rw-p 00020000 fc:00 5374007    /lib32/ld-2.19.so
+ff9eb000-ffa0c000 rw-p 00000000 00:00 0          [stack]</code></pre>
+</section><section id="readelf" class="slide level2">
+<h1>readelf</h1>
+<ul>
+<li><code>readelf -a ./a</code></li>
+<li>超多細節</li>
+<li>Section offset: <code>.text</code> <code>.plt</code> <code>.got.plt</code> <code>.data</code> <code>.bss</code></li>
+<li>檢查有沒有 DEP: <code>GNU_STACK RW</code></li>
+</ul>
+</section><section id="call-shared-library-function" class="slide level2">
+<h1>Call Shared Library Function</h1>
+<ul>
+<li>執行時 (連library) 動態載入 <br><code>dlopen()</code>, <code>dlsym()</code>, <code>dlclose()</code></li>
+<li>GOT - Global Offset Table</li>
+</ul>
+</section><section id="global-offset-table" class="slide level2">
+<h1>Global Offset Table</h1>
+<ul>
+<li>每次執行時 shared library 的 base address 可以不一樣 (ASLR)</li>
+<li>GOT 中記錄每個 shared function 的正確 address</li>
+<li>第一次 function call 才會先進行 address 的計算，之後就是直接跳到該 address</li>
+</ul>
+</section><section id="example-puts" class="slide level2">
+<h1>Example: puts()</h1>
+<pre class="no-highlight"><code>080482f0 &lt;puts@plt&gt;:
+ 80482f0:       ff 25 0c a0 04 08       jmp    DWORD PTR ds:0x804a00c
+ 80482f6:       68 00 00 00 00          push   0x0     
+ 80482fb:       e9 e0 ff ff ff          jmp    80482e0 &lt;_init+0x30&gt; 
+                                        ; go function loader
+0804841d &lt;main&gt;:                        ; loader will update GOT entry
+ ...
+ 8048426:       c7 04 24 d0 84 04 08    mov    DWORD PTR [esp],0x80484d0
+ 804842d:       e8 be fe ff ff          call   80482f0 &lt;puts@plt&gt;
+
+0804a000 &lt;_GLOBAL_OFFSET_TABLE_&gt;:
+ ...
+ 804a00c:       f6 82 04 08             ; 0x080482f6 = &lt;puts@plt + 6&gt;</code></pre>
+<ul>
+<li>根據 memory 中位址 <strong>0x804a00c</strong> 的值，決定要跳哪</li>
+<li><span style="white-space: nowrap">第一次 <code>804842d</code>→<code>80482f0</code><strong>→</strong><code>80482f6</code>→<code>80482fb</code>→<code>loader()</code></span></li>
+<li>之後 <code>804842d</code>→<code>80482f0</code><strong>→</strong><code>puts()</code></li>
+</ul>
+</section><section id="hook" class="slide level2">
+<h1>Hook</h1>
+<ul>
+<li>因為 shared function 是根據 <strong>symbol name</strong> 決定要載入哪一個，如果多個 library 中有同名 function 的話，先 load 進來的優先</li>
+<li>LD_PRELOAD - 指定在正常載入過程前要先載入的 library</li>
+<li>可以用來 hook 自訂的 function，蓋掉原本的功能</li>
+</ul>
+</section><section id="compile-shared-library" class="slide level2">
+<h1>Compile Shared Library</h1>
+<ul>
+<li><code>gcc -o hook.so hook.c -fPIC -shared</code></li>
+</ul>
+<pre class="cpp"><code>#include &lt;stdio.h&gt;
+int strcmp(const char* str1, const char* str2) {
+  printf(&quot;CMP [%s] [%s]\n&quot;, str1, str2);
+  return 0; // 直接回傳相等
+}</code></pre>
+</section><section id="hook-hijack" class="slide level2">
+<h1>Hook &amp; Hijack</h1>
+<pre class="no-highlight"><code>$ cat login.c
+...
+    if (strcmp(input, password)==0) {
+...
+ 
+$ ./login
+Input password: AAA
+FAILED
+$ LD_PRELOAD=./hook.so ./login
+Input password: AAA
+CMP [AAA] [password]
+OK</code></pre>
+</section><section id="security-issue" class="slide level2">
+<h1>Security Issue</h1>
+<ul>
+<li>LD_PRELOAD 會造成安全上的問題</li>
+<li>因此有 effective user bit (-rwsr-xr-x) 使用 LD_PRELOAD 時，effective 會無效</li>
+<li>編譯時可以加上 -static 參數，這樣就不是 dynamically linked，也不能被 hook</li>
+</ul>
+</section><section id="ltrace" class="slide level2">
+<h1>ltrace</h1>
+<ul>
+<li>追踨有哪些 shared function 被呼叫</li>
+</ul>
+<pre class="no-highlight"><code>__libc_start_main(0x4005ed, 1, 0x7fffd3047048, 0x400640 &lt;unfinished ...&gt;
+__isoc99_scanf(0x4006c4, 0x601080, 0x7fffd3047058, 0AAA
+) = 1
+strcmp(&quot;AAA&quot;, &quot;password&quot;) = -47
+puts(&quot;FAILED&quot;FAILED
+) = 7
++++ exited (status 0) +++</code></pre>
+</section></section>
+    </div>
+  </div>
+
+  <script src="reveal.js/lib/js/head.min.js"></script>
+  <script src="reveal.js/js/reveal.min.js"></script>
+
+  <script>
+
+      // Full list of configuration options available here:
+      // https://github.com/hakimel/reveal.js#configuration
+      Reveal.initialize({
+        controls: true,
+        progress: true,
+        history: true,
+        center: true,
+        theme: 'my', // available themes are in /css/theme
+        transition: 'linear', // default/cube/page/concave/zoom/linear/fade/none
+
+        // Optional libraries used to extend on reveal.js
+        dependencies: [
+          { src: 'reveal.js/lib/js/classList.js', condition: function() { return !document.body.classList; } },
+          { src: 'reveal.js/plugin/highlight/highlight.js', async: true, callback: function() { hljs.initHighlightingOnLoad(); } },
+          { src: 'reveal.js/plugin/zoom-js/zoom.js', async: true, condition: function() { return !!document.body.classList; } },
+          { src: 'reveal.js/plugin/notes/notes.js', async: true, condition: function() { return !!document.body.classList; } },
+//          { src: 'reveal.js/plugin/search/search.js', async: true, condition: function() { return !!document.body.classList; }, }
+//          { src: 'reveal.js/plugin/remotes/remotes.js', async: true, condition: function() { return !!document.body.classList; } }
+]});
+    </script>
+  </body>
+</html>

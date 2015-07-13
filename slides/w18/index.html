@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="generator" content="pandoc">
+  <title>Final Attack &amp; Defense</title>
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <link rel="stylesheet" href="reveal.js/lib/css/tomorrow-night-bright.css">
+  <link rel="stylesheet" href="reveal.js/css/reveal.min.css"/>
+    <style type="text/css">code{white-space: pre;}</style>
+    <link rel="stylesheet" href="reveal.js/css/theme/simple.css" id="theme">
+<!--<link rel="stylesheet" media="print" href="reveal.js/css/print/pdf.css" />-->
+<!-- If the query includes 'print-pdf', include the PDF print sheet -->
+<script>
+  if( window.location.search.match( /print-pdf/gi ) ) {
+    var link = document.createElement( 'link' );
+    link.rel = 'stylesheet';
+    link.type = 'text/css';
+    link.href = 'reveal.js/css/print/pdf.css';
+    document.getElementsByTagName( 'head' )[0].appendChild( link );
+  }
+</script>
+  <!--[if lt IE 9]>
+  <script src="reveal.js/lib/js/html5shiv.js"></script>
+  <![endif]-->
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+
+<section>
+    <h1 class="title">Final Attack &amp; Defense</h1>
+    <h3 class="date"></h3>
+</section>
+
+<section><section id="final-exam" class="titleslide slide level1"><h1>Final Exam</h1></section><section id="attack-defense" class="slide level2">
+<h1>Attack &amp; Defense</h1>
+<p><a href="http://ct.ctf.tw">2015 CTCTF</a></p>
+</section><section id="date" class="slide level2">
+<h1>Date</h1>
+<ul>
+<li>時間: 1/17 9:00~17:00 &amp; 1/18 9:00~15:00</li>
+<li>測試時間: 1/16 20:00~22:00</li>
+</ul>
+</section><section id="type" class="slide level2">
+<h1>Type</h1>
+<ul>
+<li>本次比賽類型為 Attack &amp; Defense</li>
+<li>每支隊伍負責維護一台 server (gamebox) 上的數個 service</li>
+<li>比賽中攻擊其它隊伍的 service，並且修補自己 service 的漏洞</li>
+</ul>
+</section><section id="access" class="slide level2">
+<h1>Access</h1>
+<ul>
+<li>每支隊伍會收到一組 OpenVPN key &amp; config</li>
+<li>一個 token 用來在上傳 flag 時識別上傳的隊伍</li>
+<li>一組 ssh key 用來登入 gamebox</li>
+</ul>
+</section><section id="network" class="slide level2">
+<h1>Network</h1>
+<ul>
+<li>用 OpenVPN 連入</li>
+<li>各隊 subnet: 10.217.x.0/24</li>
+</ul>
+</section><section id="gamebox" class="slide level2">
+<h1>Gamebox</h1>
+<ul>
+<li>10.217.x.201</li>
+<li>Ubuntu 12.04(?) 64bit</li>
+<li>ssh -i key.pem ctf@10.217.x.201</li>
+<li>chown, su for each services</li>
+<li>No root</li>
+</ul>
+</section><section id="forbidden" class="slide level2">
+<h1>Forbidden</h1>
+<ul>
+<li>禁止以大量的連線、流量或 fork bomb 等資源消耗型攻擊進行 DOS 或 DDOS，允許利用 service 本身漏洞造成 service crash 或結果不正確</li>
+<li>Service 本身必需在裁判方提供的 server 上運行</li>
+</ul>
+</section><section id="protection" class="slide level2">
+<h1>Protection</h1>
+<ul>
+<li>原則上任何對 service 加固的方式都是允許的，但當裁判認定加固方式過於白爛時，會要求參賽隊伍移除
+<ul>
+<li>將服務用 qemu 包起來</li>
+<li>原則上 service 的設計會儘量讓這類防禦方式無效</li>
+</ul></li>
+<li>裁判方不提供備份及救援，請自行做好備分及權限控管</li>
+</ul>
+</section><section id="service-check" class="slide level2">
+<h1>Service Check</h1>
+<ul>
+<li>主辦方會對各隊 service 進行測試，在修補漏洞或加固時要注意避免影響 service 的「預期行為」
+<ul>
+<li>一個 buffer overflow 的漏洞顯然不是設計者預期該有的行為可以修掉</li>
+<li>加大 buffer 或是限制 input 長度</li>
+</ul></li>
+<li>裁判方不會試圖觸發漏洞或讓 service crash。</li>
+</ul>
+</section><section id="tcp-packets" class="slide level2">
+<h1>TCP Packets</h1>
+<ul>
+<li>所有進出 gamebox 的流量由裁判方紀錄，參賽隊伍並可以利用 sftp 從 10.217.x.1 下載</li>
+<li>每個回合為一個 pcap 單檔，每個單檔延遲3回合開放，保留 30 分鐘</li>
+</ul>
+</section><section id="scoring" class="slide level2">
+<h1>Scoring</h1>
+<ul>
+<li>假設隊伍 A 利用 service 的漏洞入侵後取得 B 隊的 flag 並在該回合內上傳至評分系統，視為 A 對 B 入侵成功，B 為「被入侵」</li>
+<li>如果 service 沒有通過裁判方的檢查，視為 service down</li>
+<li>「被入侵」以及「service down」皆扣 15 分</li>
+<li>「被入侵」隊伍所失的 15 分，由入侵該隊的隊伍平分</li>
+<li>「service down」隊伍所失的 15 分，由其它該 service 正常的隊伍平分</li>
+</ul>
+</section><section id="scoring-example" class="slide level2">
+<h1>Scoring Example</h1>
+<ul>
+<li>各隊失分 (被入侵 + service down):
+<ul>
+<li>A = -0 -0</li>
+<li>B = -15 -15</li>
+<li>C = -15 -15</li>
+<li>D = -15 -0</li>
+</ul></li>
+<li>各隊得分
+<ul>
+<li>A(入侵 B + 入侵 C + 入侵 D + service 正常) = 15 + 15/2 + 15 + 30/2</li>
+<li>B(入侵 C) =15/2 C = 0</li>
+<li>D(service 正常) = 30/2</li>
+</ul></li>
+<li>總分變化: A = 52.5, B = 22.5, C = -30, D = 0</li>
+</ul>
+</section><section id="npc" class="slide level2">
+<h1>NPC</h1>
+<ul>
+<li>10.217.1.201 為 NPC 隊伍之 gamebox
+<ul>
+<li>service 不會做加固</li>
+<li>flag 會更新，分數計算視為一般隊伍</li>
+</ul></li>
+<li>裁判會用這隊放 hint 或調整分數</li>
+</ul>
+</section><section id="irc" class="slide level2">
+<h1>IRC</h1>
+<ul>
+<li>chat.freenode.net #ctctf</li>
+</ul>
+</section></section>
+<section><section id="openvpn" class="titleslide slide level1"><h1>OpenVPN</h1></section><section id="test-client-config" class="slide level2">
+<h1>Test Client Config</h1>
+<ul>
+<li>本日測試用</li>
+<li><a href="http://judge.csie.ctf.tw/client.tar.gz">config.tar.gz</a>
+<ul>
+<li>ca.crt</li>
+<li>client.crt</li>
+<li>client.key</li>
+<li>client.conf</li>
+</ul></li>
+</ul>
+</section><section id="windows" class="slide level2">
+<h1>Windows</h1>
+<ul>
+<li><a href="https://openvpn.net/index.php/open-source/downloads.html">Downloads</a></li>
+<li><a href="http://swupdate.openvpn.org/community/releases/openvpn-install-2.3.6-I601-x86_64.exe">OpenVPN GUI</a></li>
+<li>config 解到 <code>C:\Program Files\OpenVPN\config</code>，把 client.conf 改成 client.ovpn</li>
+<li>admin 執行 OpenVPN GUI -&gt; connect</li>
+</ul>
+<pre class="no-highlight"><code> C:\Program Files\OpenVPN\config 的目錄
+
+ 2015/01/08  上午 11:48    &lt;DIR&gt;          .
+ 2015/01/08  上午 11:48    &lt;DIR&gt;          ..
+ 2015/01/07  下午 05:20             1,464 ca.crt
+ 2015/01/07  下午 05:20             4,228 client.crt
+ 2015/01/07  下午 05:20               916 client.key
+ 2015/01/07  下午 05:20               182 client.ovpn
+ 2015/01/07  上午 11:46               213 README.txt</code></pre>
+</section><section id="ubuntu-debian" class="slide level2">
+<h1>Ubuntu / Debian</h1>
+<ul>
+<li><code>tar zxvf client.tar.gz</code></li>
+<li><code>apt-get install openvpn</code></li>
+<li><code>sudo openvpn client.conf</code></li>
+</ul>
+</section><section id="mac-osx" class="slide level2">
+<h1>Mac OSX</h1>
+<ul>
+<li><a href="https://esystem.csie.ntu.edu.tw/nalab/vpn/doc">Tunnelblick</a></li>
+<li>解開 client.tar.gz，點兩下 client.conf (或改 client.ovpn)</li>
+</ul>
+</section><section id="check" class="slide level2">
+<h1>Check</h1>
+<ul>
+<li>會得到一個 tun device 和 IP = 10.88.219.x</li>
+<li><code>ping 10.88.219.1</code></li>
+</ul>
+</section></section>
+<section><section id="try-atk-def" class="titleslide slide level1"><h1>Try ATK &amp; DEF</h1></section><section id="teams" class="slide level2">
+<h1>Teams</h1>
+<ul>
+<li>請各隊派一人來拿 ssh 密碼</li>
+</ul>
+<pre class="no-highlight"><code>&lt;(_ _)&gt; shik @10.88.219.101 
+YSTP @10.88.219.102
+wolfcat @10.88.219.103
+WTFTJ @10.88.219.104
+aaaay @10.88.219.105
+IlIIIllIIlll @10.88.219.106
+TeamSoloMid @10.88.219.107
+HackStuff @10.88.219.108
+i11usi0n @10.88.219.109
+WEEEEEEEEE @10.88.219.110
+happy CTF @10.88.219.111
+AuditorTrollTeam @10.88.219.112</code></pre>
+</section><section id="submit-flag" class="slide level2">
+<h1>Submit Flag</h1>
+<pre class="no-highlight"><code>$ nc judge.csie.ctf.tw 1337
+Your team ID (1~12): 1
+&gt; 08ae6a23db8318a02cf68e396652cb5f
+Round: 4735651
+Nope
+&gt; 94c21bb4acd850625d08563a6ba4f14b
+Ok (2)
+&gt;</code></pre>
+</section><section id="pwning-matrix" class="slide level2">
+<h1>Pwning Matrix</h1>
+<ul>
+<li><a href="http://judge.csie.ctf.tw">Matrix</a> <br> <img src="p.png" /></li>
+</ul>
+</section></section>
+    </div>
+  </div>
+
+  <script src="reveal.js/lib/js/head.min.js"></script>
+  <script src="reveal.js/js/reveal.min.js"></script>
+
+  <script>
+
+      // Full list of configuration options available here:
+      // https://github.com/hakimel/reveal.js#configuration
+      Reveal.initialize({
+        controls: true,
+        progress: true,
+        history: true,
+        center: true,
+        theme: 'my', // available themes are in /css/theme
+        transition: 'linear', // default/cube/page/concave/zoom/linear/fade/none
+
+        // Optional libraries used to extend on reveal.js
+        dependencies: [
+          { src: 'reveal.js/lib/js/classList.js', condition: function() { return !document.body.classList; } },
+          { src: 'reveal.js/plugin/highlight/highlight.js', async: true, callback: function() { hljs.initHighlightingOnLoad(); } },
+          { src: 'reveal.js/plugin/zoom-js/zoom.js', async: true, condition: function() { return !!document.body.classList; } },
+          { src: 'reveal.js/plugin/notes/notes.js', async: true, condition: function() { return !!document.body.classList; } },
+//          { src: 'reveal.js/plugin/search/search.js', async: true, condition: function() { return !!document.body.classList; }, }
+//          { src: 'reveal.js/plugin/remotes/remotes.js', async: true, condition: function() { return !!document.body.classList; } }
+]});
+    </script>
+  </body>
+</html>

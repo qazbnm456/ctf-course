@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="generator" content="pandoc">
+  <title>Defense in CTF</title>
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <link rel="stylesheet" href="reveal.js/lib/css/tomorrow-night-bright.css">
+  <link rel="stylesheet" href="reveal.js/css/reveal.min.css"/>
+    <style type="text/css">code{white-space: pre;}</style>
+    <link rel="stylesheet" href="reveal.js/css/theme/simple.css" id="theme">
+<!--<link rel="stylesheet" media="print" href="reveal.js/css/print/pdf.css" />-->
+<!-- If the query includes 'print-pdf', include the PDF print sheet -->
+<script>
+  if( window.location.search.match( /print-pdf/gi ) ) {
+    var link = document.createElement( 'link' );
+    link.rel = 'stylesheet';
+    link.type = 'text/css';
+    link.href = 'reveal.js/css/print/pdf.css';
+    document.getElementsByTagName( 'head' )[0].appendChild( link );
+  }
+</script>
+  <!--[if lt IE 9]>
+  <script src="reveal.js/lib/js/html5shiv.js"></script>
+  <![endif]-->
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+
+<section>
+    <h1 class="title">Defense in CTF</h1>
+    <h3 class="date"></h3>
+</section>
+
+<section><section id="defense" class="titleslide slide level1"><h1>Defense</h1></section><section id="defense-1" class="slide level2">
+<h1>Defense</h1>
+<ul>
+<li>阻截攻擊不論在實務上或在 CTF 裡都是重要的工作</li>
+<li>為了比賽的遊戲性及可看性，防禦的難度會比正常情況高</li>
+</ul>
+</section><section id="attack-defense-規則" class="slide level2">
+<h1>Attack &amp; Defense 規則</h1>
+<ul>
+<li>每支隊伍負責管裡一模一樣的 server &amp; services
+<ul>
+<li>Services 以特定的 port 對所有隊伍開放</li>
+</ul></li>
+<li>透過攻擊其它隊伍的服務，入侵對方主機
+<ul>
+<li>Judge 以是否能得到對方主機上的 flag 來判定是否入侵成功</li>
+</ul></li>
+</ul>
+</section><section id="section" class="slide level2">
+<h1></h1>
+<figure>
+<img src="images/att_def.png" />
+</figure>
+</section><section id="defcon-attack-defense-rules" class="slide level2">
+<h1>Defcon Attack &amp; Defense Rules</h1>
+<ul>
+<li>共 20 隊，每隊擁有相同的 ARM gamebox</li>
+<li>每個 service 以獨立的 user 運作，另外有一個 team user 可以任意 su 成 service user
+<ul>
+<li>每個 flag 只有對應的 service user 有讀取權限</li>
+</ul></li>
+<li>Service 故障跟 flag 被偷的失分相同，皆為 19 分</li>
+<li>每個 round 五分鐘，flag 會更新且取得的 flag 必須在該 round submit 才有效</li>
+</ul>
+</section><section id="防禦的困難點" class="slide level2">
+<h1>防禦的困難點</h1>
+<ul>
+<li>沒有 root，有不少工作沒辦法做
+<ul>
+<li>iptables</li>
+<li>log / tcpdump</li>
+<li>權限的控管</li>
+</ul></li>
+<li>沒有 ptrace、seccomp 等制作 sandbox 用的 library</li>
+<li>沒有即時的流量監控</li>
+</ul>
+</section><section id="防禦工作及方式" class="slide level2">
+<h1>防禦工作及方式</h1>
+<ul>
+<li>修補漏洞
+<ul>
+<li>Patch</li>
+<li>Hook</li>
+</ul></li>
+<li>妨礙漏洞利用
+<ul>
+<li>Wrapper / filter</li>
+<li>Misc.</li>
+</ul></li>
+<li>封包分析
+<ul>
+<li>尋找攻擊封包</li>
+</ul></li>
+</ul>
+</section></section>
+<section><section id="binary-patching" class="titleslide slide level1"><h1>Binary Patching</h1></section><section id="binary-patching-1" class="slide level2">
+<h1>Binary Patching</h1>
+<ul>
+<li>在沒有 source 的情況下，直接修改 binary 修補漏洞</li>
+<li>平常可以應用在軟體的破解、修改上</li>
+<li>在逆向時也常常會需要 patching
+<ul>
+<li>移除一些 anti-debuging 或修正 disassemble 的片段</li>
+<li>加入 tracing 或 logging function</li>
+</ul></li>
+</ul>
+</section><section id="static-dynamic" class="slide level2">
+<h1>Static &amp; Dynamic</h1>
+<ul>
+<li>依照修改 binary 檔的時間，可以分為 static 和 dynamic</li>
+<li>Static 直接修改原 binary，取代原本的指令</li>
+<li>Dynamic 在程式啟動後先載入一段 code 去修改 binary 中的指令</li>
+</ul>
+</section><section id="example" class="slide level2">
+<h1>Example</h1>
+<ul>
+<li><code>sprintf()</code> buffer overflow in <a href="src/pepper">pepper</a> (ISG 2014)
+<ul>
+<li>Extend stack frame size</li>
+<li>Reallocate buffer</li>
+</ul></li>
+</ul>
+</section><section id="example-1" class="slide level2">
+<h1>Example</h1>
+<ul>
+<li>Reverse <a href="src/bin100">bin100</a> (ebCTF 2013)
+<ul>
+<li>My first CTF task</li>
+<li>Replace <code>==</code> to <code>!=</code></li>
+</ul></li>
+</ul>
+</section><section id="limitations" class="slide level2">
+<h1>Limitations</h1>
+<ul>
+<li>Static patching 受到 bytecode 長度的限制，沒有辦法加入比原本長的指令</li>
+<li>假如要插入的內容在 runtime 時才能確定則沒辦法 patch</li>
+</ul>
+</section><section id="dynamic-patching" class="slide level2">
+<h1>Dynamic Patching</h1>
+<ul>
+<li><a href="src.tar.gz">src</a></li>
+<li>在 runtime 時動態加入或修改指令
+<ul>
+<li><code>mprotect()</code> 解除記憶體寫入保謢</li>
+<li>插入或修改 binary code</li>
+<li>如果有必要，可以加掛新的 page 用來放更長的 code</li>
+<li><code>mprotect()</code> 打開寫入保謢</li>
+</ul></li>
+<li>只要修改 patcher 就可以加上新的 patch</li>
+</ul>
+</section><section id="dynamic-patching-1" class="slide level2">
+<h1>Dynamic Patching</h1>
+<ul>
+<li>基本上可以加入任意大小的 patch <img src="images/patch1.png" /></li>
+</ul>
+</section><section id="dynamic-patching-2" class="slide level2">
+<h1>Dynamic Patching</h1>
+<ul>
+<li>載入 patch 可以利用 <code>LD_PRELOAD</code></li>
+<li><code>__attribute__ ((constructor)) void init(void)</code>
+<ul>
+<li>會在所有 segment 載入後才執行，但在 main 之前</li>
+</ul></li>
+<li>可以 allocate 需要額外的 function</li>
+</ul>
+</section><section id="example-2" class="slide level2">
+<h1>Example</h1>
+<ul>
+<li>Input out of range in <a href="src/pepper">pepper</a> (ISG 2014)
+<ul>
+<li>存在一個 information leaking 漏洞</li>
+<li>加入對輸入範圍的檢查</li>
+</ul></li>
+</ul>
+</section><section id="dynamic-patching-3" class="slide level2">
+<h1>Dynamic Patching</h1>
+<ul>
+<li>沒有 binary code 長度限制的問題</li>
+<li>適合要加入某些新的功能時</li>
+<li>甚至可以輕易換掉整個 function
+<ul>
+<li>只要在 function entry 插入 <code>jmp</code> 指令</li>
+</ul></li>
+<li>版本控制容易</li>
+</ul>
+</section><section id="limitations-1" class="slide level2">
+<h1>Limitations</h1>
+<ul>
+<li>寫壞時 debug 比較困難
+<ul>
+<li>比賽進行中更難</li>
+</ul></li>
+<li>可能不需要寫 assembly code，但要注意 gcc 編譯出來的 function 不會改到重要的 register
+<ul>
+<li>可以內嵌 assembly 備份全部 register</li>
+<li>如果功能較簡單不如直接寫 assembly</li>
+</ul></li>
+<li>有 ASLR 時要注意改寫的 address</li>
+</ul>
+</section><section id="tricks" class="slide level2">
+<h1>Tricks</h1>
+<ul>
+<li>Hijack with trap</li>
+<li>Without <code>LD_PRELOAD</code> (e.g. with <code>-static</code>)</li>
+</ul>
+</section><section id="hijack-with-trap" class="slide level2">
+<h1>Hijack with trap</h1>
+<ul>
+<li>空間太小連一個 function 都放不下，或不好處理</li>
+<li>可以插入 debugging trap (0xCC)，只要一個 byte</li>
+<li>註冊 signal handler on <code>SIGTRAP</code></li>
+<li>signal handler 還可以保證不會影響 register 的內容</li>
+<li>有多個 handler 時可以用 <code>eip</code> 的值來判斷是從哪裡跳過來</li>
+</ul>
+</section><section id="without-ld_preload" class="slide level2">
+<h1>Without LD_PRELOAD</h1>
+<ul>
+<li><code>LD_PRELOAD</code> 沒有辦法使用或沒有作用，例如 static ELF</li>
+<li>改寫 <code>main()</code> 或 <code>_start</code>，加入一段 loader
+<ul>
+<li><code>mmap</code> + <code>jmp/call</code> 載入自己的 patcher</li>
+<li>loader 載入完 patcher 後，可以還原 main() 原本的內容，最後再重新跳回 main()</li>
+</ul></li>
+</ul>
+<figure>
+<img src="images/loader.png" />
+</figure>
+</section></section>
+<section><section id="wrapper" class="titleslide slide level1"><h1>Wrapper</h1></section><section id="wrapper-1" class="slide level2">
+<h1>Wrapper</h1>
+<ul>
+<li>實際上沒有修補好漏洞，但包上 wrapper 後將使得 exploit 變得困難或不可能</li>
+<li>使用上較靈活，也不一定要修改到 binary 本身</li>
+<li>發現漏洞後，可以加上針對這個漏洞的 wrapper</li>
+<li>也有泛用型的 wrapper，針對常見的漏洞型態提供保護
+<ul>
+<li>類似於 application firewall</li>
+</ul></li>
+</ul>
+</section><section id="用途" class="slide level2">
+<h1>用途</h1>
+<ul>
+<li>Input/output filter</li>
+<li>Library harden</li>
+<li>Sandbox</li>
+</ul>
+</section><section id="input-filter" class="slide level2">
+<h1>Input filter</h1>
+<ul>
+<li>ASCII/number only
+<ul>
+<li>Buffer overflow 要跳轉的 address 難以直接輸入</li>
+</ul></li>
+<li>Forbidden keywords
+<ul>
+<li>e.g. 過濾 flag, cat, sh 等 keyword</li>
+</ul></li>
+<li>過濾 format string</li>
+</ul>
+</section><section id="output-filter" class="slide level2">
+<h1>Output filter</h1>
+<ul>
+<li>過濾 flag 內容</li>
+<li>過濾非 ASCII 字元
+<ul>
+<li>避免 information leaking</li>
+</ul></li>
+</ul>
+</section><section id="filter-實作" class="slide level2">
+<h1>Filter 實作</h1>
+<ul>
+<li>由於沒有 tcpdump 拿不到即時的封包，需加在 binary 上</li>
+<li>Hook 掉 input / output function
+<ul>
+<li>在 <code>read()</code>, <code>gets()</code>, <code>scanf()</code> 等 function 上過濾</li>
+</ul></li>
+<li>轉接 file descriptor / socket
+<ul>
+<li>接走 remote 來的輸入，檢查後再送進 service</li>
+<li><code>remote &lt;-&gt; I/O filter &lt;-&gt; local service</code></li>
+</ul></li>
+</ul>
+</section><section id="filter" class="slide level2">
+<h1>Filter</h1>
+<ul>
+<li>過濾字元是很有效的通用防禦，在沒有辦法輸入特定 address 的情況下要進行 control flow hijack 十分困難</li>
+<li>因此 judge 方會通常針對這點進行檢查，這樣的 filter 很可能導致 service check fail</li>
+</ul>
+</section><section id="library-harden" class="slide level2">
+<h1>Library Harden</h1>
+<ul>
+<li>修改或換掉 library，使對方難以利用 ret2lib 進行攻擊</li>
+<li>也可以加強 library 本身的安全特性
+<ul>
+<li>關閉 format string 的寫入</li>
+<li><code>malloc()</code> 隨機化</li>
+</ul></li>
+</ul>
+</section><section id="library-harden-1" class="slide level2">
+<h1>Library Harden</h1>
+<ul>
+<li>換掉 library
+<ul>
+<li>使對方沒有辦法得到 <code>system()</code>, <code>exec()</code> 的 address</li>
+<li><code>LD_LIBRARY_PATH</code>, <code>LD_PRELOAD</code></li>
+</ul></li>
+<li>patch 掉不需要的 function
+<ul>
+<li>將 <code>system()</code>, <code>exec()</code> 等 function 破壞掉</li>
+<li>還是有可能直接被 ROP 攻擊</li>
+</ul></li>
+</ul>
+</section><section id="sandbox" class="slide level2">
+<h1>Sandbox</h1>
+<ul>
+<li>使用 <code>ptrace</code> 攔截不合法 system call</li>
+<li>使用 <code>seccomp</code> 禁止不合法 system call</li>
+<li>有經驗的 attack &amp; defense 比賽都會關閉這兩個功能
+<ul>
+<li>或巧妙的設計 service 使得這些 system call 會被使用，而無法完全禁止</li>
+</ul></li>
+</ul>
+</section></section>
+<section><section id="binary-harden" class="titleslide slide level1"><h1>Binary Harden</h1></section><section id="binary-harden-1" class="slide level2">
+<h1>Binary Harden</h1>
+<ul>
+<li>加強 binary 本身，使漏洞難以利用，在還未找到漏洞時可以直接加上這類防禦
+<ul>
+<li>開啟 DEP</li>
+<li>GOT readonly</li>
+<li>Stackguard randomize</li>
+<li>Dynamic recompile</li>
+</ul></li>
+</ul>
+</section><section id="開啟-dep-保謢" class="slide level2">
+<h1>開啟 DEP 保謢</h1>
+<pre class="no-highlight"><code>Usage: execstack [OPTION...]
+execstack -- program to query or set executable stack flag
+
+  -c, --clear-execstack      Clear executable stack flag bit
+  -q, --query                Query executable stack flag bit
+  -s, --set-execstack        Set executable stack flag bit
+  -?, --help                 Give this help list
+      --usage                Give a short usage message
+  -V, --version              Print program version
+</code></pre>
+</section><section id="got-唯讀" class="slide level2">
+<h1>GOT 唯讀</h1>
+<ul>
+<li>Global offset table 用來查詢外部 library 中函式的位址</li>
+<li>因為是 load before call 所以是 table 可寫的，內容有可能被改寫導致 hijack</li>
+<li>可以使用 binary patching，改掉 <code>.plt</code> 上根據 GOT 內容 <code>jmp</code> 的寫法，直接寫死 function address</li>
+</ul>
+</section><section id="stackguard-randomize" class="slide level2">
+<h1>Stackguard Randomize</h1>
+<ul>
+<li><code>mov eax, large gs:14h</code> 取得的 canary 內容是固定的
+<ul>
+<li>對 fork 式且沒有重新 exec 的 service 來說，可以被 stack reading 推出 canary</li>
+<li>若存在 information leaking 漏洞，就可以繞過 stackguard 的保護</li>
+</ul></li>
+</ul>
+</section><section id="section-1" class="slide level2">
+<h1></h1>
+<figure>
+<img src="images/stack-overflow2.png" />
+</figure>
+</section><section id="stackguard-randomize-1" class="slide level2">
+<h1>Stackguard Randomize</h1>
+<ul>
+<li>改成 <code>call get_canary()</code> 這樣的型式，去拿新的隨機 canary</li>
+<li>檢查時的 <code>xor eax, large gs:14h</code> 也要一起修改</li>
+<li>這兩段 bytecode 是固定的很容易辨認，基本上做簡單的字串比對並取代不太會出問題，保險一點也可以再從 disassembler 檢查</li>
+</ul>
+</section><section id="stackguard-randomize-2" class="slide level2">
+<h1>Stackguard Randomize</h1>
+<ul>
+<li>多層 function call 時，要將上一層的 canary 存起來</li>
+<li>取得 canary 時，push 進 stack 保存起來</li>
+<li>檢查 canary 時，從 stack pop 出來檢查</li>
+</ul>
+</section><section id="dynamic-recompile" class="slide level2">
+<h1>Dynamic Recompile</h1>
+<ul>
+<li>利用類似 binary translation 的技術，以 basicblock 為單位重新建立 binary，並在這個過程中動態加強安全性</li>
+<li><a href="https://software.intel.com/en-us/articles/pin-a-dynamic-binary-instrumentation-tool">Intel Pin - A Dynamic Binary Instrumentation Tool</a></li>
+<li>也可以自己寫簡單的 translator</li>
+</ul>
+</section><section id="dynamic-recompile-1" class="slide level2">
+<h1>Dynamic Recompile</h1>
+<ul>
+<li>用途
+<ul>
+<li>Whole binary ASLR</li>
+<li>Call/return sanity check</li>
+<li>取代 ptrace/seccomp</li>
+</ul></li>
+</ul>
+</section><section id="whole-binary-aslr" class="slide level2">
+<h1>Whole binary ASLR</h1>
+<ul>
+<li>一般來說 code 本身的 ASLR 功能是關閉的 (without <code>-pie -fPIC</code>)，可以被 ROP 類的攻擊方法利用</li>
+<li>DBI 可以將真正執行的 code，以 basicblock chaining 的方式重新排列到新的位置去，造成 ret2text 類的攻擊幾乎不可能</li>
+</ul>
+</section><section id="callreturn-sanity-check" class="slide level2">
+<h1>Call/return sanity check</h1>
+<ul>
+<li>Function call 發生時，對 return address 做額外的保護
+<ul>
+<li>備份到它處，避免 buffer overflow 時被改動</li>
+<li>xor 一個值 (類似 stackguard)，攻擊者進行 buffer overflow 時沒有辦法知道要覆蓋怎樣的內容</li>
+</ul></li>
+<li>Return 時進行檢查</li>
+</ul>
+</section><section id="取代-ptraceseccomp" class="slide level2">
+<h1>取代 ptrace/seccomp</h1>
+<ul>
+<li>可以直接取代掉 <code>int</code>, <code>syscall</code> 指令，對 syscall number 進行檢查</li>
+<li>完全阻止開出 shell 的可能</li>
+</ul>
+</section><section id="limitations-2" class="slide level2">
+<h1>Limitations</h1>
+<ul>
+<li>效能問題，以 Intel Pin 來說大約下降 30%~40%</li>
+<li>防範 control flow hijack，但無法阻止邏輯上的漏洞或 information leaking</li>
+<li>因為過度有效，以 CTF 來說有可能直接被比賽規則禁用</li>
+</ul>
+</section></section>
+<section><section id="misc" class="titleslide slide level1"><h1>Misc</h1></section><section id="logging-by-wrapper" class="slide level2">
+<h1>Logging by Wrapper</h1>
+<ul>
+<li>可以從直接從 wrapper 得到輸入輸出
+<ul>
+<li>提早得到攻擊封包</li>
+</ul></li>
+<li>Backtrace &amp; function calls
+<ul>
+<li>檢查有沒有異常的 function call</li>
+<li>利用 footprint 和 backtrace 的資訊，很容易追踨並找出漏洞</li>
+</ul></li>
+</ul>
+</section><section id="drop-connection" class="slide level2">
+<h1>Drop connection</h1>
+<ul>
+<li>以 xinetd 建立的 service 來說，可以從 <code>REMOTE_HOST</code> 這個環境變數得到對方的 IP</li>
+<li>如果 judge 的檢查機制不夠強，可以直接切掉強隊的連線</li>
+</ul>
+</section><section id="同步執行檢驗" class="slide level2">
+<h1>同步執行檢驗</h1>
+<ul>
+<li>以 wrapper 將 input 同時送到兩個 process 上執行</li>
+<li>Service 如果沒有隨機成份，理論上輸出要完全相同
+<ul>
+<li>除了跟 ASLR 有關的部份!</li>
+<li>如果兩個 process 的 output 不匹配，很可能就是被攻擊了</li>
+</ul></li>
+</ul>
+</section><section id="反向-stack" class="slide level2">
+<h1>反向 stack</h1>
+<ul>
+<li>發現有 buffer overflow 時，如果只是加大 stack frame 還是有可能被攻擊</li>
+<li>反過來把 stack frame 開在 return address 之後</li>
+</ul>
+<pre class="no-highlight"><code>var1                 return addr
+buf1           --&gt;   ...
+...                  var1
+return addr          buf1</code></pre>
+</section><section id="字串取代" class="slide level2">
+<h1>字串取代</h1>
+<ul>
+<li>想使用 wrapper 過濾 keyword (e.g. flag) 但因為 judge 的 check script 會包含該 keyword，不可以直接 reject</li>
+<li>輸入時取代字串，輸出時再換回
+<ul>
+<li><code>flag -&gt; f14g</code>, <code>f14g -&gt; flag</code></li>
+<li>對方試圖讀取 flag 內容時會失敗，但 judge checking 又可以檢查到正確的輸出</li>
+</ul></li>
+</ul>
+</section><section id="流量重新導向" class="slide level2">
+<h1>流量重新導向</h1>
+<ul>
+<li>導向至其它 server
+<ul>
+<li>一般規定必需在本機上執行</li>
+</ul></li>
+<li>所有 service 導向至同一個 user</li>
+</ul>
+</section><section id="conclusions" class="slide level2">
+<h1>Conclusions</h1>
+<ul>
+<li>Defense 其實是很容易的
+<ul>
+<li>特別是在 CTF 中，時間有限而且還沒辦法得知對方做了哪些防護</li>
+<li>也因此良好的 attack &amp; defense 題目很難出</li>
+</ul></li>
+<li>實務上 sandbox 和 DBI 一類的防護很有效
+<ul>
+<li>但沒有辦法避免 information leaking</li>
+<li>多少會造成 performance 下降的問題</li>
+</ul></li>
+</ul>
+</section></section>
+    </div>
+  </div>
+
+  <script src="reveal.js/lib/js/head.min.js"></script>
+  <script src="reveal.js/js/reveal.min.js"></script>
+
+  <script>
+
+      // Full list of configuration options available here:
+      // https://github.com/hakimel/reveal.js#configuration
+      Reveal.initialize({
+        controls: true,
+        progress: true,
+        history: true,
+        center: true,
+        theme: 'my', // available themes are in /css/theme
+        transition: 'linear', // default/cube/page/concave/zoom/linear/fade/none
+
+        // Optional libraries used to extend on reveal.js
+        dependencies: [
+          { src: 'reveal.js/lib/js/classList.js', condition: function() { return !document.body.classList; } },
+          { src: 'reveal.js/plugin/highlight/highlight.js', async: true, callback: function() { hljs.initHighlightingOnLoad(); } },
+          { src: 'reveal.js/plugin/zoom-js/zoom.js', async: true, condition: function() { return !!document.body.classList; } },
+          { src: 'reveal.js/plugin/notes/notes.js', async: true, condition: function() { return !!document.body.classList; } },
+//          { src: 'reveal.js/plugin/search/search.js', async: true, condition: function() { return !!document.body.classList; }, }
+//          { src: 'reveal.js/plugin/remotes/remotes.js', async: true, condition: function() { return !!document.body.classList; } }
+]});
+    </script>
+  </body>
+</html>

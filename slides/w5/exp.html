@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="generator" content="pandoc">
+  <title>Exploit Writing</title>
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <link rel="stylesheet" href="reveal.js/lib/css/tomorrow-night-bright.css">
+  <link rel="stylesheet" href="reveal.js/css/reveal.min.css"/>
+    <style type="text/css">code{white-space: pre;}</style>
+    <link rel="stylesheet" href="reveal.js/css/theme/simple.css" id="theme">
+  <link rel="stylesheet" media="print" href="reveal.js/css/print/pdf.css" />
+  <!--[if lt IE 9]>
+  <script src="reveal.js/lib/js/html5shiv.js"></script>
+  <![endif]-->
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+
+<section>
+    <h1 class="title">Exploit Writing</h1>
+    <h3 class="date"></h3>
+</section>
+
+<section><section id="source-code" class="titleslide slide level1"><h1>Source Code</h1></section><section id="source-code-1" class="slide level2">
+<h1>Source Code</h1>
+<p><a href="https://csie.ctf.tw/slides/w5/w5.tar.gz">Examples</a></p>
+</section></section>
+<section><section id="exploit-writing" class="titleslide slide level1"><h1>Exploit Writing</h1></section><section id="目標" class="slide level2">
+<h1>目標</h1>
+<ul>
+<li>從頭到尾寫一次，確保每個人都會寫 exploit</li>
+<li>確保作業 0x03</li>
+</ul>
+</section><section id="例題" class="slide level2">
+<h1>例題</h1>
+<p><a href="https://csie.ctf.tw/problems/14">Example1</a></p>
+</section><section id="setup" class="slide level2">
+<h1>Setup</h1>
+<ul>
+<li>IDA - 靜態分析</li>
+<li>gdb - 動態調試</li>
+<li>ncat - 在本地開啟服務</li>
+<li><a href="http://sourceforge.net/projects/hte/files/ht-source/ht-2.0.22.tar.gz">ht</a> - 修改 binary</li>
+</ul>
+</section><section id="在本地開服務" class="slide level2">
+<h1>在本地開服務</h1>
+<p><code>ncat -vc ./vuln1 -kl 8888</code></p>
+<ul>
+<li><code>-v</code> debug info</li>
+<li><code>-c</code> 要執行的 command</li>
+<li><code>-l</code> 指定服務所在的 port</li>
+<li><code>-k</code> keep alive</li>
+</ul>
+</section><section id="尋找漏洞" class="slide level2">
+<h1>尋找漏洞</h1>
+<ul>
+<li>Static analysis</li>
+<li>Fuzz</li>
+</ul>
+</section><section id="binary-patching" class="slide level2">
+<h1>Binary Patching</h1>
+<ul>
+<li>修改 binary 讓 debug 方便一點</li>
+</ul>
+</section><section id="function-hooking" class="slide level2">
+<h1>Function Hooking</h1>
+<ul>
+<li><code>gcc alarm_hook.c -o alarm_hook.so \</code><br><code>-m32 -fPIC -shared</code></li>
+<li><code>LD_PRELOAD=./alarm_hook ./vuln1</code></li>
+</ul>
+</section><section id="指令-library" class="slide level2">
+<h1>指令 library</h1>
+<ul>
+<li><code>LD_LIBRARY_PATH=. ./vuln1</code></li>
+</ul>
+<pre class="cpp"><code>unsigned int alarm(unsigned int x) {
+  return 0;
+}</code></pre>
+</section><section id="gdb-attach" class="slide level2">
+<h1>gdb attach</h1>
+<ul>
+<li>service 啟動後再 attach</li>
+<li><code>pidof vuln1</code></li>
+<li><code>attach &lt;pid&gt;</code></li>
+</ul>
+</section><section id="gdbserver" class="slide level2">
+<h1>gdbserver</h1>
+<ul>
+<li><code>gdbserver localhost:4444 ./vuln1</code></li>
+<li><code>gdbserver --wrapper env LD_LIBRARY_PATH=. \</code><br><code>LD_PRELOAD=./alarm_hook.so -- \</code><br><code>localhost:4444 ./vuln1</code></li>
+<li>gdb 裡使用 <code>target remote localhost:4444</code> 連線到 gdbserver</li>
+</ul>
+</section><section id="ncat-gdbserver" class="slide level2">
+<h1>ncat + gdbserver</h1>
+<ul>
+<li><code>ncat -vc 'gdbserver --wrapper env \</code><br> <code>LD_LIBRARY_PATH=. LD_PRELOAD=./alarm_hook.so \</code><br><code>-- localhost:4444 ./vuln1' -kl 8888</code></li>
+</ul>
+</section><section id="qemu" class="slide level2">
+<h1>qemu</h1>
+<ul>
+<li><code>qemu-i386 -g 4444 ./vuln1</code></li>
+<li><code>qemu-i386 -strace ./vuln1</code></li>
+<li><code>qemu-i386 -d cpu ./vuln1</code></li>
+</ul>
+</section><section id="fetch-information" class="slide level2">
+<h1>Fetch information</h1>
+<ul>
+<li>利用 output function</li>
+<li>libc base address, stack address</li>
+</ul>
+</section><section id="return-to-function" class="slide level2">
+<h1>Return to Function</h1>
+<ul>
+<li>在 stack 上構造參數</li>
+<li>pop 掉參數後，可以再串連下一個 function</li>
+</ul>
+</section><section id="gets---system-combo" class="slide level2">
+<h1>gets - system Combo</h1>
+<ul>
+<li>取得 libc base 後執行 <code>gets(cmd); system(cmd)</code></li>
+<li>cmd 可以隨便找一個已知 address 的可寫位址</li>
+</ul>
+</section><section id="exploit-trace" class="slide level2">
+<h1>Exploit &amp; Trace</h1>
+<ul>
+<li><a href="src/exp1.py">Exploit</a></li>
+<li><a href="src/log-dump/log1.html">Trace</a></li>
+</ul>
+</section></section>
+<section><section id="tricks" class="titleslide slide level1"><h1>Tricks</h1></section><section id="freebuf" class="slide level2">
+<h1>FreeBuf</h1>
+<ul>
+<li>global variable</li>
+<li>.data, .bss</li>
+<li><del>.rodata</del> readonly</li>
+<li>got 所在的 page</li>
+</ul>
+</section><section id="keep-alive" class="slide level2">
+<h1>Keep alive</h1>
+<ul>
+<li>leak + ret2lib 需要兩步，而且 ret2lib 的 address 一開始 hijack 時還未知</li>
+<li>ret2main</li>
+</ul>
+</section><section id="無法-ret2main" class="slide level2">
+<h1>無法 ret2main</h1>
+<p><a href="https://csie.ctf.tw/problems/15">Example2</a></p>
+</section><section id="exploit-trace-1" class="slide level2">
+<h1>Exploit &amp; Trace</h1>
+<ul>
+<li><a href="src/exp2.py">Exploit</a></li>
+<li><a href="src/log-dump/log2.html">Trace</a></li>
+</ul>
+</section></section>
+<section><section id="olympic-ctf-2014---echof" class="titleslide slide level1"><h1>Olympic CTF 2014 - Echof</h1></section><section id="echof" class="slide level2">
+<h1>Echof</h1>
+<p><a href="https://csie.ctf.tw/problems/16">Echof</a></p>
+</section></section>
+    </div>
+  </div>
+
+  <script src="reveal.js/lib/js/head.min.js"></script>
+  <script src="reveal.js/js/reveal.min.js"></script>
+
+  <script>
+
+      // Full list of configuration options available here:
+      // https://github.com/hakimel/reveal.js#configuration
+      Reveal.initialize({
+        controls: true,
+        progress: true,
+        history: true,
+        center: true,
+        theme: 'my', // available themes are in /css/theme
+        transition: 'linear', // default/cube/page/concave/zoom/linear/fade/none
+
+        // Optional libraries used to extend on reveal.js
+        dependencies: [
+          { src: 'reveal.js/lib/js/classList.js', condition: function() { return !document.body.classList; } },
+          { src: 'reveal.js/plugin/highlight/highlight.js', async: true, callback: function() { hljs.initHighlightingOnLoad(); } },
+          { src: 'reveal.js/plugin/zoom-js/zoom.js', async: true, condition: function() { return !!document.body.classList; } },
+          { src: 'reveal.js/plugin/notes/notes.js', async: true, condition: function() { return !!document.body.classList; } },
+//          { src: 'reveal.js/plugin/search/search.js', async: true, condition: function() { return !!document.body.classList; }, }
+//          { src: 'reveal.js/plugin/remotes/remotes.js', async: true, condition: function() { return !!document.body.classList; } }
+]});
+    </script>
+  </body>
+</html>

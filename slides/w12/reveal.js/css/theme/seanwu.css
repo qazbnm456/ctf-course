@@ -1,0 +1,186 @@
+@font-face {
+  font-family: 'League Gothic';
+  src: url("../../lib/font/league_gothic-webfont.eot");
+  src: url("../../lib/font/league_gothic-webfont.eot?#iefix") format("embedded-opentype"), url("../../lib/font/league_gothic-webfont.woff") format("woff"), url("../../lib/font/league_gothic-webfont.ttf") format("truetype"), url("../../lib/font/league_gothic-webfont.svg#LeagueGothicRegular") format("svg");
+  font-weight: normal;
+  font-style: normal; }
+
+@font-face {
+  font-family: MyTitleChinese;
+  src: local("LiHei Pro"), local("儷黑Pro") local("微軟正黑體"), local("Microsoft JhengHei");
+  unicode-range: U+4E00-9FFF;
+  font-style: normal; }
+
+@font-face {
+  font-family: MyMainChinese;
+  /* 1. Hiragino looks better than JhengHei and Mac often have both fonts, thus
+   *    put Hiragino prior to JengHei.
+   * 2. Linux shows JhengHei pretty ugly, thus put Micro Hei prior to JhengHei.
+   * 3. Windows users show WenQuanYi Micro Hei pretty ugly, thus use a different stylesheet.
+   */
+  src: local(LiHei Pro), local("微軟正黑體"), local("Microsoft JhengHei");
+}
+
+/*********************************************
+ * GLOBAL STYLES
+ *********************************************/
+body {
+  background-color: #fffffb; }
+
+.reveal {
+  font-family: MyMainChinese, "Open Sans", sans-serif;
+  font-size: 36px;
+  font-weight: normal;
+  letter-spacing: 0em;
+  color: #0b1013; }
+
+::selection {
+  color: #fffffb;
+  background: rgba(11, 52, 110, 0.90);
+  text-shadow: none; }
+
+.reveal li {
+  margin-bottom: 0.25em;
+}
+
+/*********************************************
+ * HEADERS
+ *********************************************/
+.reveal h1,
+.reveal h2,
+.reveal h3,
+.reveal h4,
+.reveal h5,
+.reveal h6 {
+  margin: 0 0 20px 0;
+  color: #0b1013;
+  font-family: MyTitleChinese, "League Gothic", Impact, sans-serif;
+  line-height: 0.9em;
+  letter-spacing: 0.02em;
+  text-transform: normal;
+  text-shadow: none; }
+
+.reveal h1 {
+  font-size: 3em;
+}
+
+.reveal .level2 h1 {
+  font-size: 2.4em;
+}
+
+/*********************************************
+ * LINKS
+ *********************************************/
+.reveal a:not(.image) {
+  color: #227d51;
+  text-decoration: none;
+  font-style: italic;
+  -webkit-transition: color .15s ease;
+  -moz-transition: color .15s ease;
+  -ms-transition: color .15s ease;
+  -o-transition: color .15s ease;
+  transition: color .15s ease; }
+
+.reveal a:not(.image):hover {
+  color: #5dac81;
+  text-shadow: none;
+  border: none; }
+
+/*********************************************
+ * IMAGES
+ *********************************************/
+.reveal section img {
+  margin: 15px 0px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid #08192d;
+  box-shadow: 2px 2px 15px rgba(0, 0, 0, 0.15);
+  -webkit-transition: all .2s linear;
+  -moz-transition: all .2s linear;
+  -ms-transition: all .2s linear;
+  -o-transition: all .2s linear;
+  transition: all .2s linear; }
+
+.reveal a:hover img {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: #ff0000;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.55); }
+
+/*********************************************
+ * NAVIGATION CONTROLS
+ *********************************************/
+.reveal .controls div.navigate-left,
+.reveal .controls div.navigate-left.enabled {
+  border-right-color: #08192d; }
+
+.reveal .controls div.navigate-right,
+.reveal .controls div.navigate-right.enabled {
+  border-left-color: #08192d; }
+
+.reveal .controls div.navigate-up,
+.reveal .controls div.navigate-up.enabled {
+  border-bottom-color: #08192d; }
+
+.reveal .controls div.navigate-down,
+.reveal .controls div.navigate-down.enabled {
+  border-top-color: #08192d; }
+
+.reveal .controls div.navigate-left.enabled:hover {
+  border-right-color: #0f2540; }
+
+.reveal .controls div.navigate-right.enabled:hover {
+  border-left-color: #0f2540; }
+
+.reveal .controls div.navigate-up.enabled:hover {
+  border-bottom-color: #0f2540; }
+
+.reveal .controls div.navigate-down.enabled:hover {
+  border-top-color: #0f2540; }
+
+/*********************************************
+ * PROGRESS BAR
+ *********************************************/
+.reveal .progress {
+  background: rgba(0, 0, 0, 0.2); }
+
+.reveal .progress span {
+  background: #08192d;
+  -webkit-transition: width 800ms cubic-bezier(0.26, 0.86, 0.44, 0.985);
+  -moz-transition: width 800ms cubic-bezier(0.26, 0.86, 0.44, 0.985);
+  -ms-transition: width 800ms cubic-bezier(0.26, 0.86, 0.44, 0.985);
+  -o-transition: width 800ms cubic-bezier(0.26, 0.86, 0.44, 0.985);
+  transition: width 800ms cubic-bezier(0.26, 0.86, 0.44, 0.985); }
+
+/*********************************************
+ * SLIDE NUMBER
+ *********************************************/
+.reveal .slide-number {
+  color: #08192d; 
+}
+
+
+/* del line */
+
+.reveal del{
+    position: relative;
+}
+
+.reveal del::after{
+    content: '';
+    border-top: 4px solid #0b1013;
+    position: absolute;
+    left: 0;
+    top: 55%;
+    width: 100%;
+}
+
+.reveal li code {
+    color: #2b5f75;
+    font-size: 1em;
+    padding: 2px 10px;
+    letter-spacing: -0.02em;
+}
+
+.reveal strong {
+    color: #cb1b45;
+    font-weight: normal;
+}

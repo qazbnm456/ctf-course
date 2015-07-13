@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="generator" content="pandoc">
+  <title></title>
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <link rel="stylesheet" href="reveal.js/css/reveal.min.css"/>
+  <link rel="stylesheet" href="highlightjs/styles/tomorrow-night.css">
+    <style type="text/css">code{white-space: pre;}</style>
+    <link rel="stylesheet" href="reveal.js/css/theme/simple.css" id="theme">
+    <!-- If the query includes 'print-pdf', include the PDF print sheet -->
+    <script>
+      if( window.location.search.match( /print-pdf/gi ) ) {
+        var link = document.createElement( 'link' );
+        link.rel = 'stylesheet';
+        link.type = 'text/css';
+        link.href = 'reveal.js/css/print/pdf.css';
+        document.getElementsByTagName( 'head' )[0].appendChild( link );
+      }
+    </script>
+    <!--[if lt IE 9]>
+    <script src="reveal.js/lib/js/html5shiv.js"></script>
+    <![endif]-->
+    <script src="mathjax/MathJax.js?config=TeX-AMS-MML_HTMLorMML" type="text/javascript"></script>
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+
+
+<section><section id="crypto-in-ctf" class="titleslide slide level1"><h1>Crypto in CTF</h1></section><section id="crypto-in-ctf-1" class="slide level2">
+<h1>Crypto in CTF</h1>
+<ul>
+<li>Cryptography</li>
+<li>Capture The Flag</li>
+<li>很多圖從維基來的</li>
+</ul>
+<div style="display: none;">
+<span class="math">\[
+\newcommand{\ECB}{\operatorname{ECB}}
+\newcommand{\xor}{\mathbin{\oplus}}
+\newcommand{\ceil}[1]{\left \lceil #1 \right \rceil}
+\newcommand{\floor}[1]{\left \lfloor #1 \right \rfloor}
+\newcommand{\concat}{\mathbin{\|}}
+\newcommand{\IV}{\mathit{IV}}
+\]</span>
+</div>
+</section><section id="穩固的基礎" class="slide level2">
+<h1>穩固的基礎</h1>
+<ul>
+<li>時間有限...</li>
+<li>密碼學導論</li>
+<li>密碼學專題</li>
+</ul>
+</section><section id="有啥不同" class="slide level2">
+<h1>有啥不同</h1>
+<ul>
+<li>攻擊導向</li>
+<li>通常要寫程式</li>
+<li><span class="math">\(3 ^ {-1} \pmod{13}\)</span></li>
+<li><span class="math">\(x ^ {-1} \pmod{p}\)</span></li>
+<li>會用 Ruby/Python 講講實作</li>
+</ul>
+</section><section id="攻擊對象" class="slide level2">
+<h1>攻擊對象</h1>
+<ul>
+<li>協議</li>
+<li>實作</li>
+</ul>
+</section><section id="沒事不要自己寫" class="slide level2">
+<h1>沒事不要自己寫</h1>
+<ul>
+<li>沒事不要自己寫</li>
+<li>沒事不要自己寫</li>
+<li>沒事不要自己寫</li>
+<li>很重要所有講三遍</li>
+</ul>
+</section></section>
+<section><section id="預備知識" class="titleslide slide level1"><h1>預備知識</h1></section><section id="預備知識-1" class="slide level2">
+<h1>預備知識</h1>
+<ul>
+<li>模運算</li>
+<li>異或</li>
+</ul>
+</section><section id="模運算" class="slide level2">
+<h1>模運算</h1>
+<ul>
+<li><span class="math">\(23 \equiv 2 \pmod{7}\)</span></li>
+<li><code>23 % 7 == 2</code></li>
+<li><code>-23 % 7</code>？</li>
+<li><code>-23 % -7</code>？</li>
+</ul>
+</section><section id="異或" class="slide level2">
+<h1>異或</h1>
+<ul>
+<li><span class="math">\(0111_2 \xor 1010_2 = 1101_2\)</span></li>
+<li><span class="math">\(7 \xor 10 = 13\)</span></li>
+<li><code>7 ^ 10 == 13</code></li>
+<li><code>(7 ^ 10) == 13</code></li>
+</ul>
+</section><section id="待續" class="slide level2">
+<h1>待續</h1>
+<ul>
+<li>抽象代數：群、環、體</li>
+<li>輾轉相除法</li>
+<li>中國剩餘定理</li>
+</ul>
+</section></section>
+<section><section id="石器時代" class="titleslide slide level1"><h1>石器時代</h1></section><section id="石器時代-1" class="slide level2">
+<h1>石器時代</h1>
+<ul>
+<li><del>國小回憶</del></li>
+<li>簡單、好懂、易破</li>
+<li>隨手自己亂寫個加密</li>
+<li>避免被搜到 Pattern</li>
+</ul>
+</section></section>
+<section><section id="凱薩密碼" class="titleslide slide level1"><h1>凱薩密碼</h1></section><section id="凱薩密碼-1" class="slide level2">
+<h1>凱薩密碼</h1>
+<ul>
+<li>Caesar Cipher</li>
+<li><code>HELLO</code></li>
+<li><code>IFMMP</code></li>
+<li><span class="math">\(E_k(x) = (x + k) \bmod 26\)</span></li>
+<li><span class="math">\(D_k(x) = (x - k) \bmod 26\)</span></li>
+</ul>
+</section><section id="破解凱薩密碼" class="slide level2">
+<h1>破解凱薩密碼</h1>
+<ul>
+<li>枚舉 26 種 <span class="math">\(k\)</span></li>
+<li>肉眼看看哪個有道理</li>
+<li>借助自然語言處理 (NLP)</li>
+</ul>
+</section><section id="豆知識" class="slide level2">
+<h1>豆知識</h1>
+<ul>
+<li><span class="math">\(k = 13\)</span> 的凱薩加密又稱作 ROT13</li>
+<li>ROT47</li>
+<li>加解密一模一樣</li>
+<li>Python 有內建，可以拿來繞 Filter</li>
+</ul>
+<pre class="python"><code>#!/usr/bin/env python2
+# coding: rot13 
+cevag vachg()</code></pre>
+</section><section id="豆知識-1" class="slide level2">
+<h1>豆知識</h1>
+<ul>
+<li>Vim 也有支援... <code>g?</code></li>
+<li><code>echo hello | tr a-z n-za-m</code></li>
+</ul>
+</section></section>
+<section><section id="仿射密碼" class="titleslide slide level1"><h1>仿射密碼</h1></section><section id="仿射密碼-1" class="slide level2">
+<h1>仿射密碼</h1>
+<ul>
+<li>Affine Cipher</li>
+<li><span class="math">\(k = (a, b)\)</span></li>
+<li><span class="math">\(\gcd(a, m) = 1\)</span></li>
+<li><span class="math">\(E_k(x) = (ax + b) \bmod m\)</span></li>
+<li><span class="math">\(D_k(x) = a^{-1}(x - b) \bmod m\)</span></li>
+<li><span class="math">\(a = 1\)</span> 的時候其實就是凱薩</li>
+</ul>
+</section><section id="不幸遇到模逆" class="slide level2">
+<h1>不幸遇到模逆</h1>
+<ul>
+<li>求 <span class="math">\(x^{-1} \pmod{m}\)</span></li>
+<li>使得 <span class="math">\(xx^{-1} \equiv 1 \pmod{m}\)</span></li>
+<li><span class="math">\(m\)</span> 小小的時候可以枚舉</li>
+<li>費馬小定理</li>
+<li>擴展歐幾里德算法</li>
+</ul>
+</section><section id="懶惰資工系" class="slide level2">
+<h1>懶惰資工系</h1>
+<ul>
+<li><del>數學不好</del></li>
+<li>愛用現成 Library</li>
+</ul>
+</section><section id="ruby-中的模逆" class="slide level2">
+<h1>Ruby 中的模逆</h1>
+<ul>
+<li>內建 OpenSSL Binding</li>
+</ul>
+<pre class="ruby"><code>require &#39;openssl&#39;
+
+def inv(x, m)
+  x.to_bn.mod_inverse(m)
+end</code></pre>
+</section><section id="python-中的模逆" class="slide level2">
+<h1>Python 中的模逆</h1>
+<ul>
+<li>第三方程式庫 SymPy</li>
+<li><code>pip install sympy</code></li>
+</ul>
+<pre class="python"><code>import sympy
+
+def inv(x, m):
+  return sympy.invert(x, m)</code></pre>
+</section><section id="python-中的模逆-1" class="slide level2">
+<h1>Python 中的模逆</h1>
+<ul>
+<li>更精簡一點...</li>
+</ul>
+<pre class="python"><code>import sympy
+
+inv = sympy.invert</code></pre>
+</section><section id="速度" class="slide level2">
+<h1>速度</h1>
+<ul>
+<li>複雜度大概是 <span class="math">\(O(\lg m)\)</span> 次運算</li>
+<li>超過原生整數大小的時候會變慢</li>
+<li>Python / Ruby / GMP 中大數實作</li>
+</ul>
+</section><section id="天下武功-唯快不破" class="slide level2">
+<h1>天下武功 唯快不破</h1>
+<ul>
+<li><span class="math">\(O(m)\)</span> 預處理建表</li>
+<li><em><span class="math">\(O(1)\)</span> 查詢</em></li>
+<li><span class="math">\(m\)</span> 不大，要查很多很多次的時候</li>
+<li>查過記下來的話是 <span class="math">\(O(m\lg m)\)</span></li>
+<li>要快，就用 C/C++</li>
+</ul>
+</section><section id="特化高速模逆" class="slide level2">
+<h1>特化高速模逆</h1>
+<pre class="cpp"><code>long inv[m];
+inv[1] = 1;
+for (long i = 2; i &lt; m; i++)
+  inv[i] = inv[m % i] * (m - m / i) % m;</code></pre>
+<ul>
+<li>注意整數溢出</li>
+<li>注意負數取模</li>
+</ul>
+</section><section id="解釋特化高速模逆" class="slide level2">
+<h1>解釋特化高速模逆</h1>
+<pre class="cpp"><code>inv[i] = inv[m % i] * (m - m / i) % m;</code></pre>
+<p><span class="math">\[
+\begin{align*}
+i^{-1}
+&amp;\equiv (m \bmod i)^{-1} \times (m - \floor{\frac{m}{i}}) \\
+&amp;\equiv (m - \floor{\frac{m}{i}} \times i)^{-1} \times (- \floor{\frac{m}{i}}) \\
+&amp;\equiv (- \floor{\frac{m}{i}})^{-1} \times i^{-1} \times (- \floor{\frac{m}{i}})
+\end{align*}
+\]</span></p>
+</section><section id="破解仿射密碼" class="slide level2">
+<h1>破解仿射密碼</h1>
+<ul>
+<li>枚舉 <span class="math">\((a, b)\)</span> 約 <span class="math">\(m^2\)</span> 種可能</li>
+<li>肉眼看看哪個有道理</li>
+<li>借助自然語言處理 (NLP)</li>
+</ul>
+</section></section>
+<section><section id="懶得講的傢伙們" class="titleslide slide level1"><h1>懶得講的傢伙們</h1></section><section id="懶得講的傢伙們-1" class="slide level2">
+<h1>懶得講的傢伙們</h1>
+<ul>
+<li>時間有限，該高速進入現代</li>
+<li>看到密文知道是個爛加密就好</li>
+</ul>
+</section><section id="substitution-cipher" class="slide level2">
+<h1>Substitution Cipher</h1>
+<ul>
+<li>某種字元一一對應的表</li>
+<li>頻率分析</li>
+<li>現代 S-Box 的前身</li>
+</ul>
+</section><section id="vigenere-cipher" class="slide level2">
+<h1>Vigenere Cipher</h1>
+<ul>
+<li><span class="math">\(C_i = E_K(M_i) = (M_i + K_i) \bmod 26\)</span></li>
+<li><span class="math">\(M_i = D_K(C_i) = (C_i - K_i) \bmod 26\)</span></li>
+</ul>
+<pre class="diff"><code>Plaintext : HELLO
+Key       : APPLE
+Ciphertext: HTAWS</code></pre>
+</section><section id="autokey-cipher" class="slide level2">
+<h1>Autokey Cipher</h1>
+<pre class="diff"><code>Plaintext:  ATTACK AT DAWN...
+Key:        QUEENL YA TTACK AT DAWN....
+Ciphertext: QNXEPV YT WTWP...</code></pre>
+</section><section id="adfgvx" class="slide level2">
+<h1>ADFGVX</h1>
+<ul>
+<li><code>FAXDF ADDDG DGFFF AFAX AFAFX</code></li>
+<li>看到長這樣的就是了</li>
+</ul>
+</section><section id="bifid-cipher" class="slide level2">
+<h1>Bifid Cipher</h1>
+<ul>
+<li>Polybius square</li>
+</ul>
+<pre class="diff"><code>  1 2 3 4 5
+1 B G W K Z
+2 Q P N D S
+3 I O A X E
+4 F C L U M
+5 T H Y V R
+
+F L E E A T O N C E
+4 4 3 3 3 5 3 2 4 3
+1 3 5 5 3 1 2 3 2 5
+
+44 33 35 32 43 13 55 31 23 25
+U  A  E  O  L  W  R  I  N  S</code></pre>
+</section><section id="two-square-cipher" class="slide level2">
+<h1>Two-square Cipher</h1>
+<pre class="diff"><code>E X A M P
+L B C D F
+G H I J K
+N O R S T
+U V W Y Z
+ 
+K E Y W O
+R D A B C
+F G H I J
+L M N P S
+T U V X Z
+
+Plaintext:  he lp me ob iw an ke no bi
+Ciphertext: HE DL XW SD JY AN HO TK DG</code></pre>
+</section><section id="book-cipher" class="slide level2">
+<h1>Book Cipher</h1>
+<ul>
+<li>找本書</li>
+<li>寫下位置</li>
+<li>常用聖經或字典</li>
+</ul>
+</section><section id="dvorak" class="slide level2">
+<h1>DVORAK</h1>
+<ul>
+<li>其實是種鍵盤佈局</li>
+<li>fu6g6g45j/3ru04q061j4rm6</li>
+</ul>
+</section><section id="base64" class="slide level2">
+<h1>Base64</h1>
+<ul>
+<li><span class="math">\(3 * 8 = 4 * 6\)</span></li>
+<li><code>a-zA-Z0-9+/</code></li>
+<li>用 <code>=</code> 做 padding</li>
+</ul>
+</section><section id="hill-cipher" class="slide level2">
+<h1>Hill Cipher</h1>
+<ul>
+<li>找個可逆矩陣乘上去 <span class="math">\(\pmod{26}\)</span></li>
+<li>解密就乘個反矩陣</li>
+</ul>
+</section><section id="null-cipher" class="slide level2">
+<h1>Null Cipher</h1>
+<ul>
+<li>每個 Word 字首接起來之類的</li>
+<li>藏頭文</li>
+<li>隱寫術 steganography 的起源</li>
+</ul>
+</section><section id="pig-latin" class="slide level2">
+<h1>Pig Latin</h1>
+<ul>
+<li>兒童黑話</li>
+<li>小屁孩加密</li>
+<li>子音開頭的字，將子音移到字尾，補 <code>ay</code></li>
+<li><code>happy</code> → <code>appy-hay</code></li>
+<li>母音開頭直接補 <code>ay</code></li>
+</ul>
+</section><section id="transposition-cipher" class="slide level2">
+<h1>Transposition Cipher</h1>
+<ul>
+<li>換個順序亂寫一通，再接起來</li>
+<li>最簡單的，例如</li>
+</ul>
+<pre class="diff"><code>HELLO
+WORLD</code></pre>
+<pre><code>HWEOLRLLOD</code></pre>
+</section><section id="permutation-cipher" class="slide level2">
+<h1>Permutation Cipher</h1>
+<ul>
+<li>找個排列 <span class="math">\(p_1, p_2, \ldots, p_n\)</span></li>
+<li><span class="math">\(n\)</span> 個字切成一塊，每塊重排</li>
+</ul>
+</section><section id="豬圈密碼" class="slide level2">
+<h1>豬圈密碼</h1>
+<figure>
+<img src="img/Pigpen_cipher_key.svg" />
+</figure>
+<figure>
+<img src="img/A-pigpen-message.svg" />
+</figure>
+</section></section>
+<section><section id="現代密碼學" class="titleslide slide level1"><h1>現代密碼學</h1></section></section>
+<section><section id="xor" class="titleslide slide level1"><h1>XOR</h1></section><section id="xor-1" class="slide level2">
+<h1>XOR</h1>
+<p><img src=img/XOR_ANSI_Labelled.svg width=50%></p>
+</section><section id="xor-的一些性質" class="slide level2">
+<h1>XOR 的一些性質</h1>
+<ul>
+<li><span class="math">\(a \xor b = b \xor a\)</span></li>
+<li><span class="math">\(a \xor a = 0\)</span></li>
+<li><span class="math">\(a \xor 0 = a\)</span></li>
+</ul>
+</section><section id="one-time-pad" class="slide level2">
+<h1>One-time Pad</h1>
+<ul>
+<li>電腦世界都是些 01 串 (bits)</li>
+<li>隨機 01 串 <span class="math">\(K\)</span></li>
+<li><span class="math">\(C_i = P_i \xor K_i\)</span></li>
+<li>看到密文啥也不知道（嗎）</li>
+</ul>
+</section><section id="otp-in-ruby" class="slide level2">
+<h1>OTP in Ruby</h1>
+<pre class="ruby"><code>def strxor(a, b)
+  a.bytes.zip(b.bytes).map{|x, y| x ^ y}.pack(&#39;C*&#39;)
+end</code></pre>
+</section><section id="otp-in-python" class="slide level2">
+<h1>OTP in Python</h1>
+<pre class="python"><code>def strxor(a, b):
+  return &#39;&#39;.join(chr(ord(x) ^ ord(y)) for x, y in zip(a, b))</code></pre>
+</section><section id="豆知識-2" class="slide level2">
+<h1>豆知識</h1>
+<pre class="c"><code>#include &lt;stdio.h&gt;
+#include &lt;string.h&gt;
+
+int main() {
+    char s[80];
+    int n = strlen(gets(s));
+    memfrob(s, n);
+    puts(s);
+    return 0;
+}</code></pre>
+</section><section id="攻擊-otp" class="slide level2">
+<h1>攻擊 OTP</h1>
+<ul>
+<li>爛隨機</li>
+<li>Many-time Pad</li>
+</ul>
+</section><section id="爛隨機" class="slide level2">
+<h1>爛隨機</h1>
+<ul>
+<li><code>srand(seed)</code></li>
+<li><code>srand(time(NULL))</code></li>
+</ul>
+</section><section id="many-time-pad" class="slide level2">
+<h1>Many-time Pad</h1>
+<ul>
+<li>一直用</li>
+<li>一直用</li>
+<li>一直用</li>
+<li>一直用</li>
+<li>一直用</li>
+</ul>
+</section><section id="many-time-pad-1" class="slide level2">
+<h1>Many-time Pad</h1>
+<ul>
+<li>枚舉每個 byte</li>
+<li>解出來所有明文都煞有道理不容易</li>
+<li>確定一個解得全部</li>
+<li>純文字：通通落在可見字元</li>
+<li>其他格式多半也都有 Magic Header</li>
+<li>比想像中常見 (Office 2003)</li>
+</ul>
+</section><section id="otp-優點" class="slide level2">
+<h1>OTP 優點</h1>
+<ul>
+<li>正確使用超級安全</li>
+<li>密鑰跟明文一樣長...</li>
+<li>每次要重新認真隨機很麻煩...</li>
+<li>Trade-Off</li>
+</ul>
+</section></section>
+<section><section id="block-cipher" class="titleslide slide level1"><h1>Block Cipher</h1></section><section id="block-cipher-1" class="slide level2">
+<h1>Block Cipher</h1>
+<ul>
+<li>固定長度的一塊</li>
+<li>對稱密鑰</li>
+<li><span class="math">\(C = E(K, P)\)</span></li>
+<li><span class="math">\(P = D(K, C)\)</span></li>
+<li><span class="math">\(D(K, E(K, P)) = P\)</span></li>
+</ul>
+</section><section id="加密函數" class="slide level2">
+<h1>加密函數</h1>
+<ul>
+<li>密鑰長度 <span class="math">\(k\)</span> bits</li>
+<li>區塊長度 <span class="math">\(n\)</span> bits</li>
+<li><span class="math">\(E : \{0, 1\}^k \times \{0, 1\}^n \to \{0, 1\}^n\)</span></li>
+<li>可以看成給 <span class="math">\(k\)</span> 後變出一個置換</li>
+<li>可能的置換有 <span class="math">\((2^n)!\)</span> 種</li>
+<li><span class="math">\((2^{16})!\)</span> 是個 28 萬位數...</li>
+</ul>
+</section><section id="des" class="slide level2">
+<h1>DES</h1>
+<ul>
+<li><span class="math">\(k = 56\)</span></li>
+<li><span class="math">\(n = 64\)</span></li>
+<li>用力攪個 16 輪</li>
+<li>Feistel Network</li>
+</ul>
+</section><section id="feistel-network" class="slide level2">
+<h1>Feistel Network</h1>
+<p><img src=img/Feistel_cipher_diagram_en.svg height=500px></p>
+</section><section id="f" class="slide level2">
+<h1>F</h1>
+<p><img src=img/Data_Encryption_Standard_InfoBox_Diagram.png height=500px></p>
+</section><section id="破解-des" class="slide level2">
+<h1>破解 DES</h1>
+<ul>
+<li>時代進步，以力破巧</li>
+<li>硬體做好了換掉很虧</li>
+<li>3DES</li>
+</ul>
+</section><section id="des-1" class="slide level2">
+<h1>3DES</h1>
+<ul>
+<li>一次太簡單，三次如何</li>
+<li><span class="math">\(C = E(K_1, D(K_2, E(K_3, P)))\)</span></li>
+<li><span class="math">\(P = D(K_1, E(K_2, D(K_3, P)))\)</span></li>
+<li><span class="math">\(k \in \{56, 112, 168\}\)</span></li>
+<li><span class="math">\(K_1 = K_2 = K_3\)</span> 就是 DES</li>
+<li>古老但還是很多人用，就像 COBOL 一樣</li>
+</ul>
+</section><section id="aes" class="slide level2">
+<h1>AES</h1>
+<ul>
+<li>Advanced Encryption Standard</li>
+<li>公開徵選，取代 DES</li>
+<li>Rijndael</li>
+<li><span class="math">\(k \in \{128, 192, 256\}\)</span></li>
+<li><span class="math">\(n = 128\)</span></li>
+<li>目前正確使用還挺安全的</li>
+</ul>
+</section><section id="aes-1" class="slide level2">
+<h1>AES</h1>
+<p>用力攪個很多輪，每輪</p>
+<ol type="1">
+<li>AddRoundKey: XOR 一通</li>
+<li>SubBytes: 替換一通</li>
+<li>ShiftRows: 置換一通</li>
+<li>MixColumns: 乘個可逆矩陣</li>
+</ol>
+</section><section id="鑒古知今" class="slide level2">
+<h1>鑒古知今</h1>
+<ul>
+<li>Vigenere Cipher</li>
+<li>Substitution Cipher</li>
+<li>Transposition Cipher</li>
+<li>Hill Cipher</li>
+</ul>
+</section><section id="unsolved-problem" class="slide level2">
+<h1>Unsolved Problem</h1>
+<ul>
+<li>太短了吧</li>
+<li>沒滿怎辦</li>
+<li>怎麼交換密鑰</li>
+</ul>
+</section></section>
+<section><section id="modes-of-operation" class="titleslide slide level1"><h1>Modes of Operation</h1></section><section id="modes-of-operation-1" class="slide level2">
+<h1>Modes of Operation</h1>
+<ul>
+<li>一塊太短，多用幾塊啊！</li>
+<li>適用於各種塊加密</li>
+<li>ECB, CBC, CTR, ...</li>
+</ul>
+</section></section>
+<section><section id="ecb-mode" class="titleslide slide level1"><h1>ECB Mode</h1></section><section id="ecb-mode-1" class="slide level2">
+<h1>ECB Mode</h1>
+<ul>
+<li>Electronic Code Book</li>
+<li>切塊每塊都做一樣的事情</li>
+<li>如果塊加密就是反過來</li>
+<li><code>ABCD</code> <code>EFGH</code> <code>IJKL</code></li>
+<li><code>DCBA</code> <code>HGFE</code> <code>LKJI</code></li>
+<li>乍看之下挺好的</li>
+</ul>
+</section><section id="ecb-mode-encryption" class="slide level2">
+<h1>ECB Mode Encryption</h1>
+<p><img src=img/ECB_encryption.svg width=90%></p>
+</section><section id="ecb-mode-decryption" class="slide level2">
+<h1>ECB Mode Decryption</h1>
+<p><img src=img/ECB_decryption.svg width=90%></p>
+</section><section id="問題多多" class="slide level2">
+<h1>問題多多</h1>
+<ul>
+<li>一塊解不出來，很多塊也解不出來（嗎）</li>
+<li>重複的明文會變出一樣的密文</li>
+</ul>
+<p><img src=img/Tux.jpg> <img src=img/Tux_ecb.jpg></p>
+</section><section id="encryption-oracle-attack" class="slide level2">
+<h1>Encryption Oracle Attack</h1>
+<ul>
+<li>你可以控制 <span class="math">\(A\)</span></li>
+<li>他會告訴你 <span class="math">\(\ECB(K, T \concat A \concat S)\)</span></li>
+<li>你不知道 <span class="math">\(K, T, S\)</span>，想知道 <span class="math">\(S\)</span></li>
+<li>選擇明文攻擊 (Chosen Plaintext Attack)</li>
+</ul>
+</section><section id="情境舉例" class="slide level2">
+<h1>情境舉例</h1>
+<ul>
+<li><code>session[&quot;user&quot;] = encrypt(user)</code></li>
+<li>通常是 serialized 後的物件</li>
+</ul>
+<pre class="json"><code>{
+  &quot;nickname&quot;: &quot;victim&quot;,
+  &quot;username&quot;: &quot;victim&quot;,
+  &quot;password&quot;: &quot;topsecret&quot;
+}</code></pre>
+</section><section id="情境舉例-1" class="slide level2">
+<h1>情境舉例</h1>
+<ul>
+<li>你用 XSS 撈到情敵的 Cookie 可以登入某站</li>
+<li>想要知道他的密碼，登入其他網站</li>
+<li>把 <code>nickname</code> 改成 <code>aaaaaa...aaaaaaa</code></li>
+<li>發現 Cookie 裡出現重複 Pattern！</li>
+</ul>
+</section><section id="求破" class="slide level2">
+<h1>求破</h1>
+<ul>
+<li>補齊前半</li>
+<li>弄出後半</li>
+</ul>
+</section><section id="補齊前半" class="slide level2">
+<h1>補齊前半</h1>
+<ul>
+<li>找出最小的 <span class="math">\(L\)</span></li>
+<li>使得把暱稱改成 <span class="math">\(L\)</span> 個 <code>a</code> 時</li>
+<li>Cookie 中該段的 Pattern 恰重複兩次</li>
+<li><code>...TTTT TTAA AAAA AAAA SSSS...</code></li>
+<li><code>...???? ???? 1234 1234 ????...</code></li>
+<li>二分搜、線性枚舉</li>
+</ul>
+</section><section id="弄出後半" class="slide level2">
+<h1>弄出後半</h1>
+<ul>
+<li>放 <span class="math">\(L-1\)</span> 個 <code>a</code></li>
+<li>會得到 <span class="math">\(E(k, \text{aa...a} \concat S_0)\)</span></li>
+<li>枚舉 <span class="math">\(S_0\)</span> 的可能</li>
+<li>問他 <span class="math">\(E(k, \text{aa...a} \concat x), \forall x\)</span></li>
+<li>看哪個一樣就知道 <span class="math">\(S_0\)</span> 了！</li>
+</ul>
+</section><section id="弄出後半-1" class="slide level2">
+<h1>弄出後半</h1>
+<ul>
+<li>放 <span class="math">\(L-2\)</span> 個 <code>a</code> 和 <span class="math">\(S_0\)</span></li>
+<li>會得到 <span class="math">\(E(k, \text{aa...a} \concat S_0 \concat S_1)\)</span></li>
+<li>枚舉 <span class="math">\(S_1\)</span> 的可能</li>
+<li>問他 <span class="math">\(E(k, \text{aa...a} \concat S_0 \concat x), \forall x\)</span></li>
+<li>看哪個一樣就知道 <span class="math">\(S_1\)</span> 了！</li>
+<li>依此類推，直到弄出後面所有東西</li>
+</ul>
+</section><section id="cut-and-paste-attack" class="slide level2">
+<h1>Cut-and-Paste Attack</h1>
+<ul>
+<li>反正不管在哪裡都一樣</li>
+<li>不如就胡亂地剪下貼上</li>
+</ul>
+</section><section id="情境舉例-2" class="slide level2">
+<h1>情境舉例</h1>
+<ul>
+<li>一樣是 HTTP Cookie</li>
+<li><code>nick=hacker; role=user</code></li>
+<li>把 <code>nick</code> 改成 <code>aaaaaa...aaaaaaa</code></li>
+<li>發現 Cookie 裡出現重複 Pattern！</li>
+<li>撈出後面發現是 <code>role=user</code></li>
+<li>假設 <span class="math">\(b = 8\)</span>，想要弄出 <code>role=admin</code></li>
+</ul>
+</section><section id="求破-1" class="slide level2">
+<h1>求破</h1>
+<ul>
+<li><code>nick=aaa</code> | <code>admin; r</code> | <code>ole=user</code></li>
+<li><code>nick=aaa</code> | <code>a; role=</code> | <code>user</code></li>
+<li><code>nick=aaaa; role=admin; r</code></li>
+<li>沒問題嗎？試試 Python</li>
+</ul>
+<pre class="python"><code>&gt;&gt;&gt; Cookie.SimpleCookie(&#39;nick=aaaa; role=admin; r&#39;)
+&lt;SimpleCookie: nick=&#39;aaaa&#39; role=&#39;admin&#39;&gt;</code></pre>
+</section><section id="別用-ecb" class="slide level2">
+<h1>別用 ECB</h1>
+<ul>
+<li>問題多多</li>
+<li>還是很多人誤用..</li>
+<li>亂搜到程式碼就複製貼上</li>
+<li><code>google://ECB Mode CVE</code></li>
+</ul>
+</section></section>
+<section><section id="cbc-mode" class="titleslide slide level1"><h1>CBC Mode</h1></section><section id="cbc-mode-1" class="slide level2">
+<h1>CBC Mode</h1>
+<ul>
+<li>Cipher Block Chaining</li>
+<li>明文先 XOR 上一塊密文再加密</li>
+<li>第一塊 XOR 初始向量</li>
+</ul>
+</section><section id="cbc-mode-encryption" class="slide level2">
+<h1>CBC Mode Encryption</h1>
+<p><img src=img/CBC_encryption.svg width=90%></p>
+</section><section id="cbc-mode-decryption" class="slide level2">
+<h1>CBC Mode Decryption</h1>
+<p><img src=img/CBC_decryption.svg width=90%></p>
+</section><section id="初始向量" class="slide level2">
+<h1>初始向量</h1>
+<ul>
+<li>IV, Initialization Vector</li>
+<li>必須要不可預測</li>
+<li>可公開，通常就接在密文前當 <span class="math">\(C_0\)</span> 送出</li>
+</ul>
+</section><section id="cbc-性質" class="slide level2">
+<h1>CBC 性質</h1>
+<ul>
+<li>依賴於前面加密結果</li>
+<li>隱藏 Pattern</li>
+<li>剪下貼上半殘</li>
+</ul>
+</section><section id="隱藏-pattern" class="slide level2">
+<h1>隱藏 Pattern</h1>
+<p><img src=img/Tux.jpg> <img src=img/Tux_ecb.jpg> <img src=img/Tux_secure.jpg></p>
+</section><section id="剪下貼上半殘" class="slide level2">
+<h1>剪下貼上半殘</h1>
+<ul>
+<li><span class="math">\(C_0 = \IV\)</span></li>
+<li><span class="math">\(C_0, C_1, C_2, C_3, C_4\)</span></li>
+<li><span class="math">\(C_0, C_1, C_2, C_3\)</span> 是好的</li>
+<li><span class="math">\(C_1, C_2, C_3, C_4\)</span> 是好的</li>
+<li><span class="math">\(C_0, C_1, C_3, C_4\)</span> 壞一個</li>
+</ul>
+</section><section id="可預測又如何" class="slide level2">
+<h1>可預測又如何</h1>
+<ul>
+<li>你不小心 SQL Injection 拿下某交友站資料庫</li>
+<li>可是資料庫裡的內容有加密</li>
+<li>可是你可以預測 IV</li>
+<li>選擇明文攻擊 (Chosen Plaintext Attack)</li>
+</ul>
+</section><section id="攻擊可預測-iv" class="slide level2">
+<h1>攻擊可預測 IV</h1>
+<ul>
+<li>你知道 Alice 的 IV</li>
+<li>你還是可以正常使用 DB</li>
+<li>你可以預測自己的 IV</li>
+<li><em>你可以猜 Alice 的資料</em></li>
+</ul>
+</section><section id="攻擊可預測-iv-1" class="slide level2">
+<h1>攻擊可預測 IV</h1>
+<p><span class="math">\[
+\begin{align*}
+P &amp;= \IV_{\text{you}} \xor \IV_{\text{alice}} \xor G \\
+C &amp;= E(k, \IV_y \xor P) \\
+&amp;= E(k, \IV_y \xor \IV_y \xor \IV_a \xor G) \\
+&amp;= E(k, \IV_a \xor G)
+\end{align*}
+\]</span></p>
+<p>猜對的話會發現跟資料庫中一模一樣！</p>
+</section><section id="key-as-iv" class="slide level2">
+<h1>Key as IV</h1>
+<ul>
+<li>Key 不可預測</li>
+<li>反正本來就有 Key</li>
+<li>還可以少傳一個 Block</li>
+<li>聽起來很好（嗎）</li>
+</ul>
+</section><section id="key-as-iv-問題" class="slide level2">
+<h1>Key as IV 問題</h1>
+<ul>
+<li>一樣的東西會一樣</li>
+<li>一樣的前綴會一樣</li>
+<li>選擇密文攻擊</li>
+<li>Chosen Ciphertext Attack</li>
+</ul>
+</section><section id="選擇密文攻擊" class="slide level2">
+<h1>選擇密文攻擊</h1>
+<ul>
+<li>路邊撿到一串密文 <span class="math">\(C = C_1 C_2 C_3\)</span></li>
+<li>原本解密會是 <span class="math">\(P_1 P_2 P_3\)</span></li>
+<li>偷偷改成 <span class="math">\(C&#39; = C_1 Z C_1\)</span></li>
+<li>解密得到 <span class="math">\(P&#39; = P_1&#39; P_2&#39; P_3&#39;\)</span></li>
+</ul>
+</section><section id="選擇密文攻擊-1" class="slide level2">
+<h1>選擇密文攻擊</h1>
+<p><span class="math">\[
+\begin{align*}
+P_1&#39; &amp;= D(k, C_1) \xor \IV \\
+&amp;= D(k, C_1) \xor K = P_1 \\
+P_3&#39; &amp;= D(k, C_1) \xor Z \\
+&amp;= D(k, C_1) = P_1 \xor \IV \\
+P_1&#39; \xor P_3&#39; &amp;= P_1 \xor P_1 \xor \IV = \IV = K
+\end{align*}
+\]</span></p>
+</section><section id="cbc-bit-flipping-attack" class="slide level2">
+<h1>CBC Bit Flipping Attack</h1>
+<ul>
+<li>HTTP Cookie 又來了</li>
+<li><code>nick=hacker;</code></li>
+<li>想要弄出 <code>...;admin=1;...</code></li>
+</ul>
+</section><section id="cbc-bit-flipping-attack-1" class="slide level2">
+<h1>CBC Bit Flipping Attack</h1>
+<p><span class="math">\[
+\begin{align*}
+C_i&#39; &amp;= C_i \xor X \\
+P_i&#39; &amp;= D(k, C_i&#39;) \xor C_{i-1} \\
+P_{i+1}&#39; &amp;= D(k, C_{i+1}) \xor C_i \xor X = P_{i+1} \xor X
+\end{align*}
+\]</span></p>
+</section><section id="cbc-bit-flipping-attack-2" class="slide level2">
+<h1>CBC Bit Flipping Attack</h1>
+<ul>
+<li>把 <code>nick</code> 改成 <code>aa...a</code></li>
+<li>隨便挑一段密文很可能落在 <code>aa..a</code> 中</li>
+</ul>
+<p><span class="math">\[
+\begin{align*}
+X &amp;= \text{aa..a} \xor \text{;admin=1;} \\
+P_{i+1}&#39; &amp;= P_{i+1} \xor X \\
+&amp;= P_{i+1} \xor \text{aa..a} \xor \text{;admin=1;} \\
+&amp;= \text{aa..a} \xor \text{aa..a} \xor \text{;admin=1;} \\
+&amp;= \text{;admin=1;} \\
+\end{align*}
+\]</span></p>
+</section></section>
+<section><section id="padding" class="titleslide slide level1"><h1>Padding</h1></section><section id="padding-1" class="slide level2">
+<h1>Padding</h1>
+<ul>
+<li>沒滿就補到滿</li>
+<li>補零如何</li>
+<li>如果訊息結尾本來是零就很困擾...</li>
+</ul>
+</section><section id="pkcs7-padding" class="slide level2">
+<h1>PKCS#7 Padding</h1>
+<ul>
+<li>缺 <span class="math">\(x\)</span> 個就補 <span class="math">\(x\)</span> 個 <span class="math">\(x\)</span></li>
+<li>假如塊大小是 8</li>
+<li>最後一塊原本是 <code>31 41 59 26 53</code></li>
+<li>補完變 <code>31 41 59 26 53 03 03 03</code></li>
+<li>原本就剛好滿的話就 Padding 一整塊</li>
+</ul>
+</section><section id="padding-oracle-attack" class="slide level2">
+<h1>Padding Oracle Attack</h1>
+<ul>
+<li>解密回來發現 Padding 不合法</li>
+<li>例如收到 <code>ff ff ff ff ff ff ff ff</code></li>
+<li>大部份的語言會直接 throw exception</li>
+<li><em>Information Leak</em></li>
+</ul>
+</section><section id="leave-as-homework" class="slide level2">
+<h1>Leave as Homework :)</h1>
+<ul>
+<li>下禮拜跟大家講講詳細做法</li>
+</ul>
+</section></section>
+    </div>
+  </div>
+
+
+  <script src="reveal.js/lib/js/head.min.js"></script>
+  <script src="reveal.js/js/reveal.min.js"></script>
+
+  <script>
+
+      // Full list of configuration options available here:
+      // https://github.com/hakimel/reveal.js#configuration
+      Reveal.initialize({
+        controls: true,
+        progress: true,
+        history: true,
+        center: true,
+        slideNumber: true,
+        theme: 'shik', // available themes are in /css/theme
+        transition: Reveal.getQueryHash().transition || 'default', // default/cube/page/concave/zoom/linear/fade/none
+
+        // Optional libraries used to extend on reveal.js
+        dependencies: [
+          { src: 'reveal.js/lib/js/classList.js', condition: function() { return !document.body.classList; } },
+          { src: 'reveal.js/plugin/zoom-js/zoom.js', async: true, condition: function() { return !!document.body.classList; } },
+          { src: 'reveal.js/plugin/notes/notes.js', async: true, condition: function() { return !!document.body.classList; } },
+          { src: 'highlightjs/highlight.pack.js', async: true, callback: function() { hljs.initHighlightingOnLoad(); } },
+//          { src: 'reveal.js/plugin/search/search.js', async: true, condition: function() { return !!document.body.classList; }, }
+//          { src: 'reveal.js/plugin/remotes/remotes.js', async: true, condition: function() { return !!document.body.classList; } }
+]});
+    </script>
+    </body>
+</html>

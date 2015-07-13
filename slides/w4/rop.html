@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="generator" content="pandoc">
+  <title>Return Oriented Programming</title>
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <link rel="stylesheet" href="reveal.js/lib/css/tomorrow-night-bright.css">
+  <link rel="stylesheet" href="reveal.js/css/reveal.min.css"/>
+    <style type="text/css">code{white-space: pre;}</style>
+    <link rel="stylesheet" href="reveal.js/css/theme/simple.css" id="theme">
+  <link rel="stylesheet" media="print" href="reveal.js/css/print/pdf.css" />
+  <!--[if lt IE 9]>
+  <script src="reveal.js/lib/js/html5shiv.js"></script>
+  <![endif]-->
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+
+<section>
+    <h1 class="title">Return Oriented Programming</h1>
+    <h3 class="date"></h3>
+</section>
+
+<section><section id="source-code" class="titleslide slide level1"><h1>Source code</h1></section><section id="section" class="slide level2">
+<h1></h1>
+<p><a href="w4.tar.gz">Source code</a></p>
+</section></section>
+<section><section id="return-to-code" class="titleslide slide level1"><h1>Return to Code</h1></section><section id="繞過-dep-保謢" class="slide level2">
+<h1>繞過 DEP 保謢</h1>
+<ul>
+<li>有 Data Execution Prevention 的情況下，即使能跳到 shellcode 上也沒有辦法執行</li>
+<li>不使用 shellcode，要直接利用原本程式的 code</li>
+</ul>
+</section><section id="ret2text" class="slide level2">
+<h1>ret2text</h1>
+<ul>
+<li>在 ASLR 沒有完全開啟 (gcc 預設值) 的情況下，text 段的位址是固定的，即常見的 <code>0x0804XXXX</code></li>
+<li>因此，利用程式本身 text 的內容是很容易的</li>
+<li>然而，這些 code 不一定能執行想要的功能</li>
+</ul>
+</section><section id="ret2lib" class="slide level2">
+<h1>ret2lib</h1>
+<ul>
+<li>一般情況下必定會有的 <code>libc.so.6</code></li>
+<li>函式庫預設有 ASLR 保護，在洩漏基底位址前無法利用</li>
+<li>需要先利用 ret2text 洩漏基底位址，來計算每個函式的正確位址</li>
+<li>前提是有每個函式在函式庫裡的正確偏移量，通常是要拿到函式庫 .so 檔</li>
+</ul>
+</section><section id="實際上的問題" class="slide level2">
+<h1>實際上的問題</h1>
+<ul>
+<li>過去沒有 DEP 時，我們只需要 return 一次，控制程式跳到 shellcode 上</li>
+<li>但 ret2text 後，會失去對程式的控制，就算能夠洩漏函式庫位址也無法再跳轉</li>
+<li>即使改用 <code>printf</code> 等格式化漏洞洩漏出函式庫基底，也不保證能找到正確的函式</li>
+</ul>
+</section><section id="return-oriented-programming" class="slide level2">
+<h1>Return Oriented Programming</h1>
+<ul>
+<li>ret2text 或 ret2lib 後，我們希望可以繼續保有對程式流程的控制</li>
+<li><strong>ret 後還可以再 ret</strong></li>
+</ul>
+</section><section id="中心思想" class="slide level2">
+<h1>中心思想</h1>
+<ul>
+<li>ret 後還可以再 ret 還可以再 ret 再 ret 後再 ret</li>
+<li>只要在堆疊上排列好每次 ret 的目標，就可以串連這些程式片段</li>
+</ul>
+</section><section id="section-1" class="slide level2">
+<h1></h1>
+<figure>
+<img src="ret-ret-ret.png" />
+</figure>
+</section><section id="rop-gadget" class="slide level2">
+<h1>ROP Gadget</h1>
+<ul>
+<li>KK <span style="font-family:&#39;Sans-serif&#39;">[`gædʒɪt]</span> 小機件；（小巧的）器具；小玩意兒[C]</li>
+<li>這些用來串連的 code 越短越好，最好只留下需要的功能</li>
+</ul>
+</section><section id="斷章取義" class="slide level2">
+<h1>斷章取義</h1>
+<ul>
+<li>Gadget 一般來說包含 <code>ret</code> 前的數個指令，不需要從整個函式起點開始</li>
+<li>通常是 pop 數個暫存器後就 ret，這樣只要在堆疊上依序放好就可以控制暫存器的值</li>
+</ul>
+</section><section id="gadget-finder" class="slide level2">
+<h1>Gadget Finder</h1>
+<ul>
+<li><a href="https://github.com/JonathanSalwan/ROPgadget">ROPgadget</a></li>
+<li><code>pip install ropgadget</code></li>
+<li>找出特定的 ROP gadget</li>
+</ul>
+<pre class="no-highlight"><code>0x0804860c : pop ebx ; pop esi ; pop edi ; pop ebp ; ret
+0x080483a1 : pop ebx ; ret
+0x0804860e : pop edi ; pop ebp ; ret
+0x0804860d : pop esi ; pop edi ; pop ebp ; ret</code></pre>
+</section><section id="使用-rop-進行-syscall" class="slide level2">
+<h1>使用 ROP 進行 syscall</h1>
+<ul>
+<li>需要控制暫存器 <code>eax</code>, <code>ebx</code>, <code>ecx</code>, <code>edx</code></li>
+<li>需要 <code>int 0x80</code></li>
+</ul>
+</section></section>
+<section><section id="case-study" class="titleslide slide level1"><h1>Case Study</h1></section><section id="rop.c" class="slide level2">
+<h1>rop.c</h1>
+<pre class="cpp"><code>#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+char buf[1024];
+
+int loop() {
+  char str[100];
+  if(!gets(str)) return 0;
+  snprintf(buf, sizeof(buf), str);
+  write(1, buf, strlen(buf));
+  return 1;
+}
+
+void main() {
+  while(loop());
+  exit(0);
+}</code></pre>
+</section><section id="exploit-流程" class="slide level2">
+<h1>Exploit 流程</h1>
+<ul>
+<li>洩漏函式庫內部位址 (由 snprintf 的 GOT entry)</li>
+<li>洩漏 StackGuard canary</li>
+<li>ret2text，尋找函式庫內的 ROP gadget (利用 write@plt)</li>
+<li>使用 ROP 呼叫 execve()，開出 shell</li>
+</ul>
+</section><section id="trace" class="slide level2">
+<h1>Trace</h1>
+<p><a href="https://csie.ctf.tw/slides/w5/log-dump/index.html">Trace-view</a></p>
+</section></section>
+    </div>
+  </div>
+
+  <script src="reveal.js/lib/js/head.min.js"></script>
+  <script src="reveal.js/js/reveal.min.js"></script>
+
+  <script>
+
+      // Full list of configuration options available here:
+      // https://github.com/hakimel/reveal.js#configuration
+      Reveal.initialize({
+        controls: true,
+        progress: true,
+        history: true,
+        center: true,
+        theme: 'my', // available themes are in /css/theme
+        transition: 'linear', // default/cube/page/concave/zoom/linear/fade/none
+
+        // Optional libraries used to extend on reveal.js
+        dependencies: [
+          { src: 'reveal.js/lib/js/classList.js', condition: function() { return !document.body.classList; } },
+          { src: 'reveal.js/plugin/highlight/highlight.js', async: true, callback: function() { hljs.initHighlightingOnLoad(); } },
+          { src: 'reveal.js/plugin/zoom-js/zoom.js', async: true, condition: function() { return !!document.body.classList; } },
+          { src: 'reveal.js/plugin/notes/notes.js', async: true, condition: function() { return !!document.body.classList; } },
+//          { src: 'reveal.js/plugin/search/search.js', async: true, condition: function() { return !!document.body.classList; }, }
+//          { src: 'reveal.js/plugin/remotes/remotes.js', async: true, condition: function() { return !!document.body.classList; } }
+]});
+    </script>
+  </body>
+</html>
